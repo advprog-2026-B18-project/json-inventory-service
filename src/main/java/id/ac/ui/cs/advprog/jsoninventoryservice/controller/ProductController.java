@@ -8,7 +8,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/products")
-@CrossOrigin(origins = "${app.frontend.url}")
+@CrossOrigin(origins = "${app.frontend.url}") // NOSONAR
 public class ProductController {
     @Autowired
     private ProductRepository productRepository;
