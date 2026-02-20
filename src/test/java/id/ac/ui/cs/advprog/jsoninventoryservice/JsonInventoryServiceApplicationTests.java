@@ -10,4 +10,9 @@ class JsonInventoryServiceApplicationTests {
     void contextLoads() {
     }
 
+    @Test
+    void testMain() {
+        JsonInventoryServiceApplication.main(new String[] {});
+    }
+
 }
