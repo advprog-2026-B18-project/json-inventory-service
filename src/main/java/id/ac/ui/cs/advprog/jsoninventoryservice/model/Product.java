@@ -1,6 +1,5 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
 
 import java.time.LocalDate;
@@ -11,8 +10,6 @@ import java.util.UUID;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.PositiveOrZero;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -42,7 +39,6 @@ public class Product {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
-    @JsonIgnore
     private Category category;
 
     @Column(name = "name", nullable = false, length = 255)
