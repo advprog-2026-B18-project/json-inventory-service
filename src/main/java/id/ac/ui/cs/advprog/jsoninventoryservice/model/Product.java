@@ -1,5 +1,6 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
 
 import java.time.LocalDate;
@@ -41,6 +42,7 @@ public class Product {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
+    @JsonIgnore
     private Category category;
 
     @Column(name = "name", nullable = false, length = 255)
