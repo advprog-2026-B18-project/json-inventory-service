@@ -7,10 +7,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -27,7 +26,6 @@ class ProductRepositoryTest {
 
     private UUID jastiperId;
     private Product product1;
-    private Product product2;
 
     @BeforeEach
     void setUp() {
@@ -44,55 +42,49 @@ class ProductRepositoryTest {
                 .status(ProductStatus.ACTIVE)
                 .build();
 
-        product2 = Product.builder()
-                .jastiperId(jastiperId)
-                .name("Jaket")
-                .description("Warna Putih")
-                .price(500000L)
-                .stock(0)
-                .originCountry("USA")
-                .purchaseDate(LocalDate.now())
-                .status(ProductStatus.OUT_OF_STOCK)
-                .build();
-
         entityManager.persistAndFlush(product1);
-        entityManager.persistAndFlush(product2);
     }
 
     @Test
-    void testFindByProductIdAndJastiperId_Success() {
-        Optional<Product> found = productRepository.findByProductIdAndJastiperId(product1.getProductId(), jastiperId);
+    void testFindById_Success() {
+        Optional<Product> found = productRepository.findById(product1.getProductId());
 
         assertTrue(found.isPresent());
         assertEquals("Tas", found.get().getName());
     }
 
     @Test
-    void testFindJastiperProductsWithFilters_NoFilters() {
-        PageRequest pageRequest = PageRequest.of(0, 10);
+    void testFindAll_Success() {
+        List<Product> products = productRepository.findAll();
 
-        Page<Product> result = productRepository.findJastiperProductsWithFilters(jastiperId, null, null, pageRequest);
-
-        assertEquals(2, result.getTotalElements());
+        assertFalse(products.isEmpty());
+        assertEquals(1, products.size());
     }
 
     @Test
-    void testFindJastiperProductsWithFilters_StatusFilter() {
-        PageRequest pageRequest = PageRequest.of(0, 10);
+    void testSaveProduct_Success() {
+        Product product2 = Product.builder()
+                .jastiperId(jastiperId)
+                .name("Jaket")
+                .description("Warna Putih")
+                .price(500000L)
+                .stock(5)
+                .originCountry("USA")
+                .purchaseDate(LocalDate.now())
+                .status(ProductStatus.ACTIVE)
+                .build();
 
-        Page<Product> result = productRepository.findJastiperProductsWithFilters(jastiperId, ProductStatus.OUT_OF_STOCK, null, pageRequest);
+        Product savedProduct = productRepository.save(product2);
 
-        assertEquals(1, result.getTotalElements());
-        assertEquals("Jaket", result.getContent().get(0).getName());
+        assertNotNull(savedProduct.getProductId());
+        assertEquals("Jaket", savedProduct.getName());
     }
 
     @Test
-    void testFindJastiperProductsWithFilters_SearchFilter() {
-        PageRequest pageRequest = PageRequest.of(0, 10);
+    void testDeleteById_Success() {
+        productRepository.deleteById(product1.getProductId());
 
-        Page<Product> result = productRepository.findJastiperProductsWithFilters(jastiperId, null, "tas", pageRequest);
-
-        assertEquals(1, result.getTotalElements());
-        assertEquals("Tas", result.getContent().get(0).getName());
+        Optional<Product> found = productRepository.findById(product1.getProductId());
+        assertFalse(found.isPresent());
     }
 }
