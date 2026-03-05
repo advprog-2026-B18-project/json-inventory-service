@@ -53,7 +53,6 @@ public class StockReservation {
 
     @Builder.Default
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "status", nullable = false)
     private ReservationStatus status = ReservationStatus.PENDING;
 
