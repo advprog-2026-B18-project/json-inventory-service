@@ -8,24 +8,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import jakarta.persistence.*;
 import jakarta.validation.constraints.PositiveOrZero;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Index;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
-import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -62,16 +49,16 @@ public class Product {
     @Column(name = "description", nullable = false, columnDefinition = "TEXT")
     private String description;
 
-    @PositiveOrZero(message = "Price cannot be negative")
+    @PositiveOrZero
     @Column(name = "price", nullable = false)
     private Long price;
 
     @Builder.Default
-    @PositiveOrZero(message = "Service fee cannot be negative")
+    @PositiveOrZero
     @Column(name = "service_fee", nullable = false)
     private Long serviceFee = 0L;
 
-    @PositiveOrZero(message = "Stock cannot be negative")
+    @PositiveOrZero
     @Column(name = "stock", nullable = false)
     private Integer stock;
 
@@ -84,20 +71,21 @@ public class Product {
     @Column(name = "weight_gram")
     private Integer weightGram;
 
+    @ElementCollection
+    @CollectionTable(name = "product_images", joinColumns = @JoinColumn(name = "product_id"))
+    @Column(name = "image")
     @Builder.Default
-    @JdbcTypeCode(SqlTypes.ARRAY)
-    @Column(name = "images", columnDefinition = "text[]")
     private List<String> images = new ArrayList<>();
 
+    @ElementCollection
+    @CollectionTable(name = "product_tags", joinColumns = @JoinColumn(name = "product_id"))
+    @Column(name = "tag")
     @Builder.Default
-    @JdbcTypeCode(SqlTypes.ARRAY)
-    @Column(name = "tags", columnDefinition = "text[]")
     private List<String> tags = new ArrayList<>();
 
-    @Builder.Default
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "status", nullable = false)
+    @Builder.Default
     private ProductStatus status = ProductStatus.ACTIVE;
 
     @Column(name = "avg_rating")
