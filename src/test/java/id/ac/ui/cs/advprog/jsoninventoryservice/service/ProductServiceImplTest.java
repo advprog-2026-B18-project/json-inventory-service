@@ -159,4 +159,36 @@ class ProductServiceImplTest {
         assertFalse(response.isPresent());
         assertEquals(10, dummyProduct.getStock());
     }
+
+    @Test
+    void testGetProductById_Found() {
+        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
+
+        Optional<ProductResponse> response = productService.getProductById(productId);
+
+        assertTrue(response.isPresent());
+        assertEquals("Test Product", response.get().getName());
+    }
+
+    @Test
+    void testGetProductById_NotFound() {
+        when(productRepository.findById(any())).thenReturn(Optional.empty());
+
+        Optional<ProductResponse> response = productService.getProductById(UUID.randomUUID());
+
+        assertFalse(response.isPresent());
+    }
+
+    @Test
+    void testReserveStock_BecomeOutOfStock() {
+        dummyProduct.setStock(5);
+        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
+        when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
+
+        Optional<ProductResponse> response = productService.reserveStock(productId, 5);
+
+        assertTrue(response.isPresent());
+        assertEquals(0, dummyProduct.getStock());
+        assertEquals(ProductStatus.OUT_OF_STOCK.name(), response.get().getStatus());
+    }
 }
