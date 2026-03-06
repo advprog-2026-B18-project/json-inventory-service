@@ -153,4 +153,29 @@ class ProductControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
     }
+
+    @Test
+    void testGetProductDetailPublic_NotFound() throws Exception {
+        when(productService.getProductById(any())).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/products/" + UUID.randomUUID()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Product not found")));
+    }
+
+    @Test
+    void testUpdateProduct_Unauthorized() throws Exception {
+        ProductUpdateRequest request = new ProductUpdateRequest();
+        request.setName("New Name");
+
+        when(productService.updateProduct(eq(jastiperId), eq(productId), any()))
+                .thenReturn(Optional.empty());
+
+        mockMvc.perform(patch("/products/" + productId)
+                        .requestAttr("jastiperId", jastiperId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound());
+    }
 }
