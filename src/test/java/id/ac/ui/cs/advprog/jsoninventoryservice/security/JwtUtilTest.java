@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class JwtUtilTest {
 
     private JwtUtil jwtUtil;
-    private final String secret = "BismillahAdproAYaAllahhTolonglahKamiiYaAllahhhAdproSusahBangettt";
+    private final String secret = "ini-isi-ngasal-aja-yang-penting-panjang";
 
     @BeforeEach
     void setUp() {
