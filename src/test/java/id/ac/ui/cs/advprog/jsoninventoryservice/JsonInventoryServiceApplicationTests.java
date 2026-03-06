@@ -12,7 +12,7 @@ class JsonInventoryServiceApplicationTests {
 
     @Test
     void testMain() {
-        JsonInventoryServiceApplication.main(new String[] {});
+        JsonInventoryServiceApplication.main(new String[] {"--server.port=0"});
     }
 
 }
