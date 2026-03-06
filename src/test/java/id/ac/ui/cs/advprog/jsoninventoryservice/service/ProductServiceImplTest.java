@@ -191,4 +191,102 @@ class ProductServiceImplTest {
         assertEquals(0, dummyProduct.getStock());
         assertEquals(ProductStatus.OUT_OF_STOCK.name(), response.get().getStatus());
     }
+
+    @Test
+    void testUpdateProduct_AllFields() {
+        ProductUpdateRequest req = new ProductUpdateRequest();
+        req.setName("New Name");
+        req.setDescription("New Desc");
+        req.setPrice(99L);
+        req.setStock(50);
+        req.setStatus("OUT_OF_STOCK");
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
+        when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
+
+        Optional<ProductResponse> res = productService.updateProduct(jastiperId, productId, req);
+
+        assertTrue(res.isPresent());
+        assertEquals("New Name", dummyProduct.getName());
+        assertEquals("New Desc", dummyProduct.getDescription());
+        assertEquals(99L, dummyProduct.getPrice());
+        assertEquals(50, dummyProduct.getStock());
+        assertEquals(ProductStatus.OUT_OF_STOCK, dummyProduct.getStatus());
+    }
+
+    @Test
+    void testMapToResponse_NullCollections() {
+        dummyProduct.setImages(null);
+        dummyProduct.setTags(null);
+        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
+
+        Optional<ProductResponse> res = productService.getProductById(productId);
+
+        assertTrue(res.isPresent());
+        assertNotNull(res.get().getImages());
+        assertNotNull(res.get().getTags());
+    }
+
+    @Test
+    void testGetMyProducts_WithNullJastiperId() {
+        Product productWithNoOwner = Product.builder().jastiperId(null).build();
+        when(productRepository.findAll()).thenReturn(List.of(dummyProduct, productWithNoOwner));
+
+        List<ProductResponse> responses = productService.getMyProducts(jastiperId);
+
+        assertEquals(1, responses.size());
+        assertEquals(productId, responses.get(0).getProductId());
+    }
+
+    @Test
+    void testUpdateProduct_OwnerMismatchReturnsEmpty() {
+        UUID wrongOwner = UUID.randomUUID();
+        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
+
+        Optional<ProductResponse> response = productService.updateProduct(wrongOwner, productId, new ProductUpdateRequest());
+
+        assertTrue(response.isEmpty());
+    }
+
+    @Test
+    void testUpdateProduct_PartialFields() {
+        ProductUpdateRequest req = new ProductUpdateRequest();
+        req.setDescription("New Description");
+        req.setStatus("HIDDEN");
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
+        when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
+
+        productService.updateProduct(jastiperId, productId, req);
+
+        assertEquals("New Description", dummyProduct.getDescription());
+        assertEquals(ProductStatus.HIDDEN, dummyProduct.getStatus());
+        assertEquals("Test Product", dummyProduct.getName());
+    }
+
+    @Test
+    void testReserveStock_StockBecomesZero() {
+        dummyProduct.setStock(10);
+        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
+        when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
+
+        Optional<ProductResponse> response = productService.reserveStock(productId, 10);
+
+        assertTrue(response.isPresent());
+        assertEquals(0, dummyProduct.getStock());
+        assertEquals(ProductStatus.OUT_OF_STOCK.name(), response.get().getStatus());
+    }
+
+    @Test
+    void testMapToResponse_WithNullImagesAndTags() {
+        dummyProduct.setImages(null);
+        dummyProduct.setTags(null);
+        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
+
+        Optional<ProductResponse> response = productService.getProductById(productId);
+
+        assertTrue(response.isPresent());
+        assertNotNull(response.get().getImages());
+        assertTrue(response.get().getImages().isEmpty());
+    }
 }
