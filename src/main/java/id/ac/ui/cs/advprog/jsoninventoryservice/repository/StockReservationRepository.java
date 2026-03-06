@@ -9,7 +9,4 @@ import java.util.UUID;
 @Repository
 public interface StockReservationRepository extends JpaRepository<StockReservation, UUID> {
 
-    // Interface ini dibiarkan ada HANYA agar Spring Data JPA
-    // otomatis membuatkan tabel 'stock_reservations' di database.
-
 }
