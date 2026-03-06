@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/v1/products")
+@RequestMapping("/products")
 public class ProductController {
 
     @Autowired
@@ -33,20 +33,20 @@ public class ProductController {
     }
 
     @GetMapping("/my")
-    public ResponseEntity<ApiResponse<List<ProductResponse>>> getMyProducts(@RequestHeader("X-User-Id") UUID jastiperId) {
+    public ResponseEntity<ApiResponse<List<ProductResponse>>> getMyProducts(@RequestAttribute("jastiperId") UUID jastiperId) {
         return ResponseUtil.success(productService.getMyProducts(jastiperId), "Successfully fetched Jastiper's product list.");
     }
 
     @PostMapping
     public ResponseEntity<ApiResponse<ProductResponse>> createProduct(
-            @RequestHeader("X-User-Id") UUID jastiperId,
+            @RequestAttribute("jastiperId") UUID jastiperId,
             @RequestBody ProductCreateRequest request) {
         return ResponseUtil.created(productService.createProduct(jastiperId, request), "Product created successfully.");
     }
 
     @PatchMapping("/{id}")
     public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
-            @RequestHeader("X-User-Id") UUID jastiperId,
+            @RequestAttribute("jastiperId") UUID jastiperId,
             @PathVariable UUID id,
             @RequestBody ProductUpdateRequest request) {
         return productService.updateProduct(jastiperId, id, request)
@@ -56,7 +56,7 @@ public class ProductController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteProduct(
-            @RequestHeader("X-User-Id") UUID jastiperId,
+            @RequestAttribute("jastiperId") UUID jastiperId,
             @PathVariable UUID id) {
         if (productService.deleteProduct(jastiperId, id)) {
             return ResponseUtil.success(null, "Product deleted successfully.");

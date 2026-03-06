@@ -12,6 +12,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import id.ac.ui.cs.advprog.jsoninventoryservice.security.JwtUtil;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -32,6 +33,9 @@ class ProductControllerTest {
 
     @MockitoBean
     private ProductService productService;
+
+    @MockitoBean
+    private JwtUtil jwtUtil;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -58,7 +62,7 @@ class ProductControllerTest {
     void testGetAllProductsPublic() throws Exception {
         when(productService.getAllProductsPublic()).thenReturn(List.of(dummyResponse));
 
-        mockMvc.perform(get("/v1/products"))
+        mockMvc.perform(get("/products"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].name").value("Controller Test Product"));
@@ -68,7 +72,7 @@ class ProductControllerTest {
     void testGetProductDetailPublic_Found() throws Exception {
         when(productService.getProductById(productId)).thenReturn(Optional.of(dummyResponse));
 
-        mockMvc.perform(get("/v1/products/" + productId))
+        mockMvc.perform(get("/products/" + productId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.name").value("Controller Test Product"));
@@ -78,8 +82,8 @@ class ProductControllerTest {
     void testGetMyProducts() throws Exception {
         when(productService.getMyProducts(jastiperId)).thenReturn(List.of(dummyResponse));
 
-        mockMvc.perform(get("/v1/products/my")
-                        .header("X-User-Id", jastiperId.toString()))
+        mockMvc.perform(get("/products/my")
+                        .requestAttr("jastiperId", jastiperId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
     }
@@ -95,8 +99,8 @@ class ProductControllerTest {
 
         when(productService.createProduct(eq(jastiperId), any(ProductCreateRequest.class))).thenReturn(dummyResponse);
 
-        mockMvc.perform(post("/v1/products")
-                        .header("X-User-Id", jastiperId.toString())
+        mockMvc.perform(post("/products")
+                        .requestAttr("jastiperId", jastiperId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -112,8 +116,8 @@ class ProductControllerTest {
         when(productService.updateProduct(eq(jastiperId), eq(productId), any(ProductUpdateRequest.class)))
                 .thenReturn(Optional.of(dummyResponse));
 
-        mockMvc.perform(patch("/v1/products/" + productId)
-                        .header("X-User-Id", jastiperId.toString())
+        mockMvc.perform(patch("/products/" + productId)
+                        .requestAttr("jastiperId", jastiperId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -124,8 +128,8 @@ class ProductControllerTest {
     void testDeleteProduct_Success() throws Exception {
         when(productService.deleteProduct(jastiperId, productId)).thenReturn(true);
 
-        mockMvc.perform(delete("/v1/products/" + productId)
-                        .header("X-User-Id", jastiperId.toString()))
+        mockMvc.perform(delete("/products/" + productId)
+                        .requestAttr("jastiperId", jastiperId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
     }
@@ -134,8 +138,8 @@ class ProductControllerTest {
     void testDeleteProduct_NotFoundOrUnauthorized() throws Exception {
         when(productService.deleteProduct(jastiperId, productId)).thenReturn(false);
 
-        mockMvc.perform(delete("/v1/products/" + productId)
-                        .header("X-User-Id", jastiperId.toString()))
+        mockMvc.perform(delete("/products/" + productId)
+                        .requestAttr("jastiperId", jastiperId))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false));
     }
@@ -144,7 +148,7 @@ class ProductControllerTest {
     void testReserveStock_Success() throws Exception {
         when(productService.reserveStock(productId, 2)).thenReturn(Optional.of(dummyResponse));
 
-        mockMvc.perform(post("/v1/products/internal/" + productId + "/stock/reserve")
+        mockMvc.perform(post("/products/internal/" + productId + "/stock/reserve")
                         .param("quantity", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
