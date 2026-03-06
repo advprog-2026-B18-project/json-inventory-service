@@ -9,7 +9,4 @@ import java.util.UUID;
 @Repository
 public interface ModerationLogRepository extends JpaRepository<ModerationLog, UUID> {
 
-    // Interface ini dibiarkan ada HANYA agar Spring Data JPA
-    // otomatis membuatkan tabel 'moderation_logs' di database.
-
 }
