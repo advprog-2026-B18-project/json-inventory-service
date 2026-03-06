@@ -55,4 +55,21 @@ class JwtUtilTest {
 
         assertEquals(expectedId, jwtUtil.getAccountIdFromToken(token));
     }
+
+    @Test
+    void testGetAccountIdFromToken_UsingIdClaim() {
+        String expectedId = "user-uuid-789";
+        String token = Jwts.builder()
+                .claim("id", expectedId)
+                .signWith(Keys.hmacShaKeyFor(secret.getBytes()))
+                .compact();
+
+        assertEquals(expectedId, jwtUtil.getAccountIdFromToken(token));
+    }
+
+    @Test
+    void testValidateToken_NullOrEmptyToken() {
+        assertFalse(jwtUtil.validateToken(null));
+        assertFalse(jwtUtil.validateToken(""));
+    }
 }

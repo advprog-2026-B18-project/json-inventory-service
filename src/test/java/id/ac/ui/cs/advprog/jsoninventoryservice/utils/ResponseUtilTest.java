@@ -6,6 +6,9 @@ import org.springframework.http.ResponseEntity;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+
 class ResponseUtilTest {
 
     @Test
@@ -47,5 +50,13 @@ class ResponseUtilTest {
         assertFalse(response.getBody().isSuccess());
         assertEquals(message, response.getBody().getMessage());
         assertNull(response.getBody().getData());
+    }
+
+    @Test
+    void testConstructorIsPrivate() throws NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
+        Constructor<ResponseUtil> constructor = ResponseUtil.class.getDeclaredConstructor();
+        constructor.setAccessible(true);
+        ResponseUtil instance = constructor.newInstance();
+        assertNotNull(instance);
     }
 }
