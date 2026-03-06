@@ -103,4 +103,35 @@ class JwtFilterTest {
         assertNull(request.getAttribute("jastiperId"));
         verify(filterChain, times(1)).doFilter(request, response);
     }
+
+    @Test
+    void testDoFilterInternal_InvalidUuidFormat() throws ServletException, IOException {
+        String token = "valid-token";
+        String invalidUuid = "bukan-format-uuid";
+
+        request.addHeader("Authorization", "Bearer " + token);
+
+        when(jwtUtil.validateToken(token)).thenReturn(true);
+        when(jwtUtil.getAccountIdFromToken(token)).thenReturn(invalidUuid);
+
+        jwtFilter.doFilterInternal(request, response, filterChain);
+
+        assertNull(request.getAttribute("jastiperId"));
+        verify(filterChain, times(1)).doFilter(request, response);
+    }
+
+    @Test
+    void testDoFilterInternal_ValidTokenButNoAccountId() throws ServletException, IOException {
+        String token = "valid-token";
+
+        request.addHeader("Authorization", "Bearer " + token);
+
+        when(jwtUtil.validateToken(token)).thenReturn(true);
+        when(jwtUtil.getAccountIdFromToken(token)).thenReturn(null);
+
+        jwtFilter.doFilterInternal(request, response, filterChain);
+
+        assertNull(request.getAttribute("jastiperId"));
+        verify(filterChain, times(1)).doFilter(request, response);
+    }
 }
