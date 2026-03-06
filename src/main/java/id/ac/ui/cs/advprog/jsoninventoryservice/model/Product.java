@@ -10,8 +10,6 @@ import java.util.UUID;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.PositiveOrZero;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
