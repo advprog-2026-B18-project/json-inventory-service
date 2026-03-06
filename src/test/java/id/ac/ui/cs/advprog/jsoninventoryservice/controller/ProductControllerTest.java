@@ -1,59 +1,152 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.controller;
 
-import id.ac.ui.cs.advprog.jsoninventoryservice.model.Product;
-import id.ac.ui.cs.advprog.jsoninventoryservice.repository.ProductRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductCreateRequest;
+import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductUpdateRequest;
+import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.ProductResponse;
+import id.ac.ui.cs.advprog.jsoninventoryservice.service.ProductService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.Collections;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@WebMvcTest(ProductController.class)
 class ProductControllerTest {
 
-    @Mock
-    private ProductRepository productRepository;
+    @Autowired
+    private MockMvc mockMvc;
 
-    @InjectMocks
-    private ProductController productController;
+    @MockitoBean
+    private ProductService productService;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    private UUID jastiperId;
+    private UUID productId;
+    private ProductResponse dummyResponse;
 
     @BeforeEach
     void setUp() {
-        MockitoAnnotations.openMocks(this);
+        jastiperId = UUID.randomUUID();
+        productId = UUID.randomUUID();
+        dummyResponse = ProductResponse.builder()
+                .productId(productId)
+                .jastiperId(jastiperId)
+                .name("Controller Test Product")
+                .price(20000L)
+                .stock(10)
+                .status("ACTIVE")
+                .build();
     }
 
     @Test
-    void testGetAll() {
-        Product p = new Product();
-        p.setId("1");
-        p.setName("Tas");
-        p.setPrice(10000.0);
-        p.setStock(5);
+    void testGetAllProductsPublic() throws Exception {
+        when(productService.getAllProductsPublic()).thenReturn(List.of(dummyResponse));
 
-        when(productRepository.findAll()).thenReturn(Collections.singletonList(p));
-        List<Product> result = productController.getAll();
-
-        assertEquals(1, result.size());
-        assertEquals("Tas", result.getFirst().getName());
-        assertEquals(10000.0, result.getFirst().getPrice());
-        assertEquals(5, result.getFirst().getStock());
-        assertEquals("1", result.getFirst().getId());
+        mockMvc.perform(get("/v1/products"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].name").value("Controller Test Product"));
     }
 
     @Test
-    void testCreate() {
-        Product p = new Product();
-        p.setName("Sepatu");
-        when(productRepository.save(any(Product.class))).thenReturn(p);
+    void testGetProductDetailPublic_Found() throws Exception {
+        when(productService.getProductById(productId)).thenReturn(Optional.of(dummyResponse));
 
-        Product result = productController.create(p);
+        mockMvc.perform(get("/v1/products/" + productId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.name").value("Controller Test Product"));
+    }
 
-        assertEquals("Sepatu", result.getName());
+    @Test
+    void testGetMyProducts() throws Exception {
+        when(productService.getMyProducts(jastiperId)).thenReturn(List.of(dummyResponse));
+
+        mockMvc.perform(get("/v1/products/my")
+                        .header("X-User-Id", jastiperId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void testCreateProduct() throws Exception {
+        ProductCreateRequest request = new ProductCreateRequest();
+        request.setName("New");
+        request.setPrice(100L);
+        request.setStock(1);
+        request.setOriginCountry("UK");
+        request.setPurchaseDate(LocalDate.now());
+
+        when(productService.createProduct(eq(jastiperId), any(ProductCreateRequest.class))).thenReturn(dummyResponse);
+
+        mockMvc.perform(post("/v1/products")
+                        .header("X-User-Id", jastiperId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.productId").value(productId.toString()));
+    }
+
+    @Test
+    void testUpdateProduct_Success() throws Exception {
+        ProductUpdateRequest request = new ProductUpdateRequest();
+        request.setPrice(500L);
+
+        when(productService.updateProduct(eq(jastiperId), eq(productId), any(ProductUpdateRequest.class)))
+                .thenReturn(Optional.of(dummyResponse));
+
+        mockMvc.perform(patch("/v1/products/" + productId)
+                        .header("X-User-Id", jastiperId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void testDeleteProduct_Success() throws Exception {
+        when(productService.deleteProduct(jastiperId, productId)).thenReturn(true);
+
+        mockMvc.perform(delete("/v1/products/" + productId)
+                        .header("X-User-Id", jastiperId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void testDeleteProduct_NotFoundOrUnauthorized() throws Exception {
+        when(productService.deleteProduct(jastiperId, productId)).thenReturn(false);
+
+        mockMvc.perform(delete("/v1/products/" + productId)
+                        .header("X-User-Id", jastiperId.toString()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void testReserveStock_Success() throws Exception {
+        when(productService.reserveStock(productId, 2)).thenReturn(Optional.of(dummyResponse));
+
+        mockMvc.perform(post("/v1/products/internal/" + productId + "/stock/reserve")
+                        .param("quantity", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
     }
 }
