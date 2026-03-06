@@ -9,7 +9,6 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -26,6 +25,7 @@ class ProductRepositoryTest {
 
     private UUID jastiperId;
     private Product product1;
+    private Product product2;
 
     @BeforeEach
     void setUp() {
@@ -42,7 +42,19 @@ class ProductRepositoryTest {
                 .status(ProductStatus.ACTIVE)
                 .build();
 
+        product2 = Product.builder()
+                .jastiperId(jastiperId)
+                .name("Jaket")
+                .description("Warna Putih")
+                .price(500000L)
+                .stock(0)
+                .originCountry("USA")
+                .purchaseDate(LocalDate.now())
+                .status(ProductStatus.OUT_OF_STOCK)
+                .build();
+
         entityManager.persistAndFlush(product1);
+        entityManager.persistAndFlush(product2);
     }
 
     @Test
@@ -54,18 +66,10 @@ class ProductRepositoryTest {
     }
 
     @Test
-    void testFindAll_Success() {
-        List<Product> products = productRepository.findAll();
-
-        assertFalse(products.isEmpty());
-        assertEquals(1, products.size());
-    }
-
-    @Test
     void testSaveProduct_Success() {
-        Product product2 = Product.builder()
-                .jastiperId(jastiperId)
-                .name("Jaket")
+        Product newProduct = Product.builder()
+                .jastiperId(UUID.randomUUID())
+                .name("Sepatu")
                 .description("Warna Putih")
                 .price(500000L)
                 .stock(5)
@@ -74,10 +78,16 @@ class ProductRepositoryTest {
                 .status(ProductStatus.ACTIVE)
                 .build();
 
-        Product savedProduct = productRepository.save(product2);
+        Product saved = productRepository.save(newProduct);
+        assertNotNull(saved.getProductId());
+        assertEquals("Sepatu", saved.getName());
+    }
 
-        assertNotNull(savedProduct.getProductId());
-        assertEquals("Jaket", savedProduct.getName());
+    @Test
+    void testFindAll_Success() {
+        var products = productRepository.findAll();
+        assertFalse(products.isEmpty());
+        assertEquals(2, products.size());
     }
 
     @Test
