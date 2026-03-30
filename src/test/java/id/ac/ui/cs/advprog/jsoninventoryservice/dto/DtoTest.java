@@ -38,7 +38,7 @@ class DtoTest {
     void testProductResponseBuilder() {
         UUID id = UUID.randomUUID();
         ProductResponse res = ProductResponse.builder()
-                .productId(id)
+                .id(id)
                 .name("Kamera")
                 .price(5000000L)
                 .stock(2)
@@ -46,7 +46,7 @@ class DtoTest {
                 .build();
 
         assertNotNull(res);
-        assertEquals(id, res.getProductId());
+        assertEquals(id, res.getId());
         assertEquals("Kamera", res.getName());
         assertEquals(5000000L, res.getPrice());
         assertEquals("ACTIVE", res.getStatus());

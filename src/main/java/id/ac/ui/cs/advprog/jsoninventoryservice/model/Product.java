@@ -31,8 +31,8 @@ public class Product {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "product_id")
-    private UUID productId;
+    @Column(name = "id", nullable = false)
+    private UUID id;
 
     @Column(name = "jastiper_id", nullable = false)
     private UUID jastiperId;

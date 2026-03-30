@@ -49,7 +49,7 @@ class ProductControllerTest {
         jastiperId = UUID.randomUUID();
         productId = UUID.randomUUID();
         dummyResponse = ProductResponse.builder()
-                .productId(productId)
+                .id(productId)
                 .jastiperId(jastiperId)
                 .name("Controller Test Product")
                 .price(20000L)
@@ -105,7 +105,7 @@ class ProductControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.productId").value(productId.toString()));
+                .andExpect(jsonPath("$.data.id").value(productId.toString()));
     }
 
     @Test

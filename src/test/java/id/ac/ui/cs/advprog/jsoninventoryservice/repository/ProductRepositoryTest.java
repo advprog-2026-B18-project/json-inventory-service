@@ -59,7 +59,7 @@ class ProductRepositoryTest {
 
     @Test
     void testFindById_Success() {
-        Optional<Product> found = productRepository.findById(product1.getProductId());
+        Optional<Product> found = productRepository.findById(product1.getId());
 
         assertTrue(found.isPresent());
         assertEquals("Tas", found.get().getName());
@@ -79,7 +79,7 @@ class ProductRepositoryTest {
                 .build();
 
         Product saved = productRepository.save(newProduct);
-        assertNotNull(saved.getProductId());
+        assertNotNull(saved.getId());
         assertEquals("Sepatu", saved.getName());
     }
 
@@ -92,9 +92,9 @@ class ProductRepositoryTest {
 
     @Test
     void testDeleteById_Success() {
-        productRepository.deleteById(product1.getProductId());
+        productRepository.deleteById(product1.getId());
 
-        Optional<Product> found = productRepository.findById(product1.getProductId());
+        Optional<Product> found = productRepository.findById(product1.getId());
         assertFalse(found.isPresent());
     }
 }
