@@ -10,7 +10,7 @@ import java.util.UUID;
 @Data
 @Builder
 public class ProductResponse {
-    private UUID productId;
+    private UUID id;
     private UUID jastiperId;
     private String name;
     private String description;

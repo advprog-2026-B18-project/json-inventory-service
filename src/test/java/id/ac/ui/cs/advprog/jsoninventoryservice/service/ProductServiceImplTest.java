@@ -40,7 +40,7 @@ class ProductServiceImplTest {
         jastiperId = UUID.randomUUID();
         productId = UUID.randomUUID();
         dummyProduct = Product.builder()
-                .productId(productId)
+                .id(productId)
                 .jastiperId(jastiperId)
                 .name("Test Product")
                 .description("Desc")
@@ -70,7 +70,7 @@ class ProductServiceImplTest {
         List<ProductResponse> responses = productService.getMyProducts(jastiperId);
 
         assertEquals(1, responses.size());
-        assertEquals(productId, responses.get(0).getProductId());
+        assertEquals(productId, responses.get(0).getId());
     }
 
     @Test
@@ -235,7 +235,7 @@ class ProductServiceImplTest {
         List<ProductResponse> responses = productService.getMyProducts(jastiperId);
 
         assertEquals(1, responses.size());
-        assertEquals(productId, responses.get(0).getProductId());
+        assertEquals(productId, responses.get(0).getId());
     }
 
     @Test

@@ -36,7 +36,7 @@ public class ProductServiceImpl implements ProductService {
         }
 
         return ProductResponse.builder()
-                .productId(product.getProductId())
+                .id(product.getId())
                 .jastiperId(product.getJastiperId())
                 .name(product.getName())
                 .description(product.getDescription())
