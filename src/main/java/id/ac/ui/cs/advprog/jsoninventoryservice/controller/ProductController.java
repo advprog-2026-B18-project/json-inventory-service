@@ -9,8 +9,8 @@ import id.ac.ui.cs.advprog.jsoninventoryservice.utils.ResponseUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.UUID;
 
 @RestController
@@ -20,21 +20,11 @@ public class ProductController {
     @Autowired
     private ProductService productService;
 
-    @GetMapping
-    public ResponseEntity<ApiResponse<List<ProductResponse>>> getAllProductsPublic() {
-        return ResponseUtil.success(productService.getAllProductsPublic(), "Successfully fetched public catalog.");
-    }
-
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<ProductResponse>> getProductDetailPublic(@PathVariable UUID id) {
         return productService.getProductById(id)
                 .map(p -> ResponseUtil.success(p, "Successfully fetched product details."))
                 .orElse(ResponseUtil.notFound("Product not found with ID: " + id));
-    }
-
-    @GetMapping("/my")
-    public ResponseEntity<ApiResponse<List<ProductResponse>>> getMyProducts(@RequestAttribute("jastiperId") UUID jastiperId) {
-        return ResponseUtil.success(productService.getMyProducts(jastiperId), "Successfully fetched Jastiper's product list.");
     }
 
     @PostMapping
@@ -71,5 +61,14 @@ public class ProductController {
         return productService.reserveStock(id, quantity)
                 .map(p -> ResponseUtil.success(p, "Stock reserved successfully."))
                 .orElse(ResponseUtil.notFound("Product not found or insufficient stock."));
+    }
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<Page<ProductResponse>>> searchProducts(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) Long minPrice,
+            @RequestParam(required = false) Long maxPrice,
+            Pageable pageable) {
+        return ResponseUtil.success(productService.searchProductsPublic(q, null, minPrice, maxPrice, pageable), "Search results fetched.");
     }
 }
