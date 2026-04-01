@@ -79,4 +79,26 @@ public class ProductController {
             Pageable pageable) {
         return ResponseUtil.success(productService.searchProductsPublic(q, jastiperId, null, null, pageable), "Jastiper catalog fetched.");
     }
+
+    @GetMapping("/my")
+    public ResponseEntity<ApiResponse<Page<ProductResponse>>> getMyCatalog(
+            @RequestAttribute("jastiperId") UUID jastiperId,
+            @RequestParam(required = false, name = "search") String q,
+            @RequestParam(required = false) String status,
+            Pageable pageable) {
+
+        return ResponseUtil.success(
+                productService.getMyCatalog(jastiperId, q, status, pageable),
+                "My catalog fetched successfully."
+        );
+    }
+
+    @GetMapping("/my/{id}")
+    public ResponseEntity<ApiResponse<ProductResponse>> getMyProductDetail(
+            @PathVariable UUID id) {
+
+        return productService.getProductById(id)
+                .map(res -> ResponseUtil.success(res, "My product detail fetched."))
+                .orElse(ResponseUtil.notFound("Product not found."));
+    }
 }
