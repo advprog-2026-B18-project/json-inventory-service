@@ -15,7 +15,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import id.ac.ui.cs.advprog.jsoninventoryservice.security.JwtUtil;
 
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -59,16 +58,6 @@ class ProductControllerTest {
     }
 
     @Test
-    void testGetAllProductsPublic() throws Exception {
-        when(productService.getAllProductsPublic()).thenReturn(List.of(dummyResponse));
-
-        mockMvc.perform(get("/products"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data[0].name").value("Controller Test Product"));
-    }
-
-    @Test
     void testGetProductDetailPublic_Found() throws Exception {
         when(productService.getProductById(productId)).thenReturn(Optional.of(dummyResponse));
 
@@ -76,16 +65,6 @@ class ProductControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.name").value("Controller Test Product"));
-    }
-
-    @Test
-    void testGetMyProducts() throws Exception {
-        when(productService.getMyProducts(jastiperId)).thenReturn(List.of(dummyResponse));
-
-        mockMvc.perform(get("/products/my")
-                        .requestAttr("jastiperId", jastiperId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
     }
 
     @Test
@@ -177,5 +156,54 @@ class ProductControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound());
+    }
+    @Test
+    void testGetMyCatalog() throws Exception {
+        when(productService.getMyCatalog(eq(jastiperId), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of(dummyResponse)));
+
+        mockMvc.perform(get("/products/my")
+                        .requestAttr("jastiperId", jastiperId)
+                        .param("search", "sepatu")
+                        .param("status", "ACTIVE")
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void testGetMyProductDetail() throws Exception {
+        when(productService.getProductById(productId))
+                .thenReturn(java.util.Optional.of(dummyResponse));
+
+        mockMvc.perform(get("/products/my/" + productId)
+                        .requestAttr("jastiperId", jastiperId))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void testSearchProducts() throws Exception {
+        when(productService.searchProductsPublic(any(), any(), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of(dummyResponse)));
+
+        mockMvc.perform(get("/products")
+                        .param("q", "baju")
+                        .param("minPrice", "10000")
+                        .param("maxPrice", "50000")
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void testSearchByJastiper() throws Exception {
+        when(productService.searchProductsPublic(any(), eq(jastiperId), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of(dummyResponse)));
+
+        mockMvc.perform(get("/products/jastipers/" + jastiperId)
+                        .param("q", "test")
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk());
     }
 }

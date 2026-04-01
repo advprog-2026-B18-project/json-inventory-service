@@ -53,27 +53,6 @@ class ProductServiceImplTest {
     }
 
     @Test
-    void testGetAllProductsPublic_OnlyActive() {
-        Product hiddenProduct = Product.builder().status(ProductStatus.HIDDEN).build();
-        when(productRepository.findAll()).thenReturn(List.of(dummyProduct, hiddenProduct));
-
-        List<ProductResponse> responses = productService.getAllProductsPublic();
-
-        assertEquals(1, responses.size());
-        assertEquals("Test Product", responses.get(0).getName());
-    }
-
-    @Test
-    void testGetMyProducts() {
-        when(productRepository.findAll()).thenReturn(List.of(dummyProduct));
-
-        List<ProductResponse> responses = productService.getMyProducts(jastiperId);
-
-        assertEquals(1, responses.size());
-        assertEquals(productId, responses.get(0).getId());
-    }
-
-    @Test
     void testCreateProduct() {
         ProductCreateRequest req = new ProductCreateRequest();
         req.setName("New Prod");
@@ -228,17 +207,6 @@ class ProductServiceImplTest {
     }
 
     @Test
-    void testGetMyProducts_WithNullJastiperId() {
-        Product productWithNoOwner = Product.builder().jastiperId(null).build();
-        when(productRepository.findAll()).thenReturn(List.of(dummyProduct, productWithNoOwner));
-
-        List<ProductResponse> responses = productService.getMyProducts(jastiperId);
-
-        assertEquals(1, responses.size());
-        assertEquals(productId, responses.get(0).getId());
-    }
-
-    @Test
     void testUpdateProduct_OwnerMismatchReturnsEmpty() {
         UUID wrongOwner = UUID.randomUUID();
         when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
@@ -288,5 +256,90 @@ class ProductServiceImplTest {
         assertTrue(response.isPresent());
         assertNotNull(response.get().getImages());
         assertTrue(response.get().getImages().isEmpty());
+    }
+
+    @Test
+    void testGetMyCatalog() {
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        org.springframework.data.domain.Page<Product> productPage = new org.springframework.data.domain.PageImpl<>(java.util.List.of(dummyProduct));
+
+        when(productRepository
+                .findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable)))
+                .thenReturn(productPage);
+
+        var result = productService.getMyCatalog(jastiperId, "Test", "ACTIVE", pageable);
+
+        assertNotNull(result);
+        verify(((org.springframework.data.jpa.repository.JpaSpecificationExecutor<Product>) productRepository), times(1))
+                .findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable));
+    }
+
+    @Test
+    void testSearchProductsPublic() {
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        org.springframework.data.domain.Page<Product> productPage = new org.springframework.data.domain.PageImpl<>(List.of(dummyProduct));
+
+        when(productRepository
+                .findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable)))
+                .thenReturn(productPage);
+
+        var result = productService.searchProductsPublic("keyword", UUID.randomUUID(), 1000L, 50000L, pageable);
+        assertNotNull(result);
+        verify(((org.springframework.data.jpa.repository.JpaSpecificationExecutor<Product>) productRepository), times(1))
+                .findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable));
+    }
+
+    @Test
+    void testGetMyCatalog_WithNullFilters() {
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        org.springframework.data.domain.Page<Product> productPage = new org.springframework.data.domain.PageImpl<>(java.util.List.of(dummyProduct));
+
+        when(productRepository
+                .findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable)))
+                .thenReturn(productPage);
+
+        var result = productService.getMyCatalog(jastiperId, null, null, pageable);
+        assertNotNull(result);
+        verify(((org.springframework.data.jpa.repository.JpaSpecificationExecutor<Product>) productRepository), times(1))
+                .findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable));
+    }
+
+    @Test
+    void testGetMyCatalog_WithOnlySearchQuery() {
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        org.springframework.data.domain.Page<Product> productPage = new org.springframework.data.domain.PageImpl<>(java.util.List.of(dummyProduct));
+
+        when(productRepository
+                .findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable)))
+                .thenReturn(productPage);
+
+        var result = productService.getMyCatalog(jastiperId, "sepatu", null, pageable);
+        org.junit.jupiter.api.Assertions.assertNotNull(result);
+    }
+
+    @Test
+    void testGetMyCatalog_WithOnlyStatus() {
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        org.springframework.data.domain.Page<Product> productPage = new org.springframework.data.domain.PageImpl<>(java.util.List.of(dummyProduct));
+
+        when(productRepository
+                .findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable)))
+                .thenReturn(productPage);
+
+        var result = productService.getMyCatalog(jastiperId, null, "ACTIVE", pageable);
+        org.junit.jupiter.api.Assertions.assertNotNull(result);
+    }
+
+    @Test
+    void testGetMyCatalog_WithEmptyStrings() {
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        org.springframework.data.domain.Page<Product> productPage = new org.springframework.data.domain.PageImpl<>(java.util.List.of(dummyProduct));
+
+        when(productRepository
+                .findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable)))
+                .thenReturn(productPage);
+
+        var result = productService.getMyCatalog(jastiperId, "", "", pageable);
+        org.junit.jupiter.api.Assertions.assertNotNull(result);
     }
 }

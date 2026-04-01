@@ -6,15 +6,18 @@ import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.ProductResponse;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.Product;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
 import id.ac.ui.cs.advprog.jsoninventoryservice.repository.ProductRepository;
+import id.ac.ui.cs.advprog.jsoninventoryservice.specification.ProductSpecification;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -52,22 +55,6 @@ public class ProductServiceImpl implements ProductService {
                 .createdAt(product.getCreatedAt())
                 .updatedAt(product.getUpdatedAt())
                 .build();
-    }
-
-    @Override
-    public List<ProductResponse> getAllProductsPublic() {
-        return productRepository.findAll().stream()
-                .filter(p -> p.getStatus() == ProductStatus.ACTIVE)
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public List<ProductResponse> getMyProducts(UUID jastiperId) {
-        return productRepository.findAll().stream()
-                .filter(p -> p.getJastiperId() != null && p.getJastiperId().equals(jastiperId))
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
     }
 
     @Override
@@ -127,5 +114,22 @@ public class ProductServiceImpl implements ProductService {
             }
             return null;
         });
+    }
+
+    @Override
+    public Page<ProductResponse> searchProductsPublic(String q, UUID jastiperId, Long minPrice, Long maxPrice, Pageable pageable) {
+        Specification<Product> spec = ProductSpecification.searchProducts(q, jastiperId, minPrice, maxPrice, ProductStatus.ACTIVE);
+        return productRepository.findAll(spec, pageable).map(this::mapToResponse);
+    }
+
+    @Override
+    public Page<ProductResponse> getMyCatalog(UUID jastiperId, String q, String status, Pageable pageable) {
+        ProductStatus filterStatus = null;
+        if (status != null && !status.trim().isEmpty()) {
+            filterStatus = ProductStatus.valueOf(status.toUpperCase());
+        }
+
+        Specification<Product> spec = ProductSpecification.searchProducts(q, jastiperId, null, null, filterStatus);
+        return productRepository.findAll(spec, pageable).map(this::mapToResponse);
     }
 }
