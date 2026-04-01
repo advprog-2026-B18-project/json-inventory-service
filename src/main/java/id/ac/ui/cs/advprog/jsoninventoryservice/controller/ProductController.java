@@ -71,4 +71,12 @@ public class ProductController {
             Pageable pageable) {
         return ResponseUtil.success(productService.searchProductsPublic(q, null, minPrice, maxPrice, pageable), "Search results fetched.");
     }
+
+    @GetMapping("/jastipers/{jastiperId}")
+    public ResponseEntity<ApiResponse<Page<ProductResponse>>> searchByJastiper(
+            @PathVariable UUID jastiperId,
+            @RequestParam(required = false) String q,
+            Pageable pageable) {
+        return ResponseUtil.success(productService.searchProductsPublic(q, jastiperId, null, null, pageable), "Jastiper catalog fetched.");
+    }
 }
