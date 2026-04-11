@@ -57,4 +57,34 @@ public class StockManagementServiceImpl implements StockManagementService {
             return ProductResponse.fromEntity(p);
         });
     }
+
+    @Override
+    @Transactional
+    public Optional<ProductResponse> releaseStock(UUID id, StockReleaseRequest req) {
+        Optional<StockReservation> optRes = reservationRepository.findByOrderIdAndProduct_Id(req.getOrderId(), id);
+
+        if (optRes.isPresent() && optRes.get().getStatus() != ReservationStatus.RELEASED) {
+            StockReservation res = optRes.get();
+            Product p = productRepository.findByIdForUpdate(id).orElseThrow();
+
+            boolean isPhysicalStockEmpty = "OUT_OF_STOCK".equalsIgnoreCase(req.getReason());
+
+            if (!isPhysicalStockEmpty) {
+                p.setStock(p.getStock() + res.getQuantity());
+                if (p.getStatus() == ProductStatus.OUT_OF_STOCK && p.getStock() > 0) {
+                    p.setStatus(ProductStatus.ACTIVE);
+                }
+            } else {
+                p.setStock(0);
+                p.setStatus(ProductStatus.OUT_OF_STOCK);
+            }
+
+            productRepository.save(p);
+            res.setStatus(ReservationStatus.RELEASED);
+            reservationRepository.save(res);
+
+            return Optional.of(ProductResponse.fromEntity(p));
+        }
+        return Optional.empty();
+    }
 }
