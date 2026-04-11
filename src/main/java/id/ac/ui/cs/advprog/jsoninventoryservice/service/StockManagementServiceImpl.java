@@ -143,4 +143,24 @@ public class StockManagementServiceImpl implements StockManagementService {
         productRepository.save(product);
         return Optional.of(ProductResponse.fromEntity(product));
     }
+
+    @Override
+    @Transactional
+    @Scheduled(fixedRate = 60000)
+    public void cleanupExpiredReservations() {
+        LocalDateTime now = LocalDateTime.now();
+        List<StockReservation> expiredReservations = reservationRepository.findExpiredReservations(now);
+
+        for (StockReservation res : expiredReservations) {
+            Product p = res.getProduct();
+            p.setStock(p.getStock() + res.getQuantity());
+            if (p.getStatus() == ProductStatus.OUT_OF_STOCK && p.getStock() > 0) {
+                p.setStatus(ProductStatus.ACTIVE);
+            }
+            productRepository.save(p);
+
+            res.setStatus(ReservationStatus.RELEASED);
+            reservationRepository.save(res);
+        }
+    }
 }
