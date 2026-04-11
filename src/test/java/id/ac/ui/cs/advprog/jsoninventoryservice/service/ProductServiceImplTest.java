@@ -3,9 +3,13 @@ package id.ac.ui.cs.advprog.jsoninventoryservice.service;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductCreateRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductUpdateRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.ProductResponse;
+import id.ac.ui.cs.advprog.jsoninventoryservice.model.Category;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.Product;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
+import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ReservationStatus;
+import id.ac.ui.cs.advprog.jsoninventoryservice.repository.CategoryRepository;
 import id.ac.ui.cs.advprog.jsoninventoryservice.repository.ProductRepository;
+import id.ac.ui.cs.advprog.jsoninventoryservice.repository.StockReservationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,10 +27,17 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("unchecked")
 class ProductServiceImplTest {
 
     @Mock
     private ProductRepository productRepository;
+
+    @Mock
+    private CategoryRepository categoryRepository;
+
+    @Mock
+    private StockReservationRepository stockReservationRepository;
 
     @InjectMocks
     private ProductServiceImpl productService;
@@ -71,12 +82,38 @@ class ProductServiceImplTest {
     }
 
     @Test
+    void testCreateProduct_WithAllFieldsAndZeroStock() {
+        ProductCreateRequest req = new ProductCreateRequest();
+        req.setName("New Prod Complete");
+        req.setDescription("Desc Complete");
+        req.setPrice(50L);
+        req.setStock(0);
+        req.setOriginCountry("JP");
+        req.setPurchaseDate(LocalDate.now());
+        req.setCategoryId(1);
+        req.setServiceFee(15000L);
+        req.setWeightGram(500);
+        req.setImages(List.of("image.jpg"));
+        req.setTags(List.of("tag1"));
+
+        Category dummyCategory = new Category();
+        dummyCategory.setCategoryId(1);
+        when(categoryRepository.findById(1)).thenReturn(Optional.of(dummyCategory));
+        when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
+
+        ProductResponse response = productService.createProduct(jastiperId, req);
+
+        assertNotNull(response);
+        verify(categoryRepository, times(1)).findById(1);
+    }
+
+    @Test
     void testUpdateProduct_Success() {
         ProductUpdateRequest req = new ProductUpdateRequest();
         req.setName("Updated Name");
         req.setStock(20);
 
-        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
         when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
 
         Optional<ProductResponse> response = productService.updateProduct(jastiperId, productId, req);
@@ -89,7 +126,7 @@ class ProductServiceImplTest {
     @Test
     void testUpdateProduct_FailWrongOwner() {
         UUID wrongJastiperId = UUID.randomUUID();
-        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
 
         Optional<ProductResponse> response = productService.updateProduct(wrongJastiperId, productId, new ProductUpdateRequest());
 
@@ -98,45 +135,14 @@ class ProductServiceImplTest {
     }
 
     @Test
-    void testDeleteProduct_Success() {
-        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
-
-        boolean result = productService.deleteProduct(jastiperId, productId);
-
-        assertTrue(result);
-        verify(productRepository, times(1)).deleteById(productId);
-    }
-
-    @Test
     void testDeleteProduct_FailWrongOwner() {
         UUID wrongJastiperId = UUID.randomUUID();
-        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
 
         boolean result = productService.deleteProduct(wrongJastiperId, productId);
 
         assertFalse(result);
-        verify(productRepository, never()).deleteById(any());
-    }
-
-    @Test
-    void testReserveStock_Success() {
-        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
-        when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
-
-        Optional<ProductResponse> response = productService.reserveStock(productId, 2);
-
-        assertTrue(response.isPresent());
-        assertEquals(8, dummyProduct.getStock());
-    }
-
-    @Test
-    void testReserveStock_FailInsufficientStock() {
-        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
-
-        Optional<ProductResponse> response = productService.reserveStock(productId, 20);
-
-        assertFalse(response.isPresent());
-        assertEquals(10, dummyProduct.getStock());
+        verify(productRepository, never()).save(any(Product.class));
     }
 
     @Test
@@ -159,19 +165,6 @@ class ProductServiceImplTest {
     }
 
     @Test
-    void testReserveStock_BecomeOutOfStock() {
-        dummyProduct.setStock(5);
-        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
-        when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
-
-        Optional<ProductResponse> response = productService.reserveStock(productId, 5);
-
-        assertTrue(response.isPresent());
-        assertEquals(0, dummyProduct.getStock());
-        assertEquals(ProductStatus.OUT_OF_STOCK.name(), response.get().getStatus());
-    }
-
-    @Test
     void testUpdateProduct_AllFields() {
         ProductUpdateRequest req = new ProductUpdateRequest();
         req.setName("New Name");
@@ -180,7 +173,7 @@ class ProductServiceImplTest {
         req.setStock(50);
         req.setStatus("OUT_OF_STOCK");
 
-        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
         when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
 
         Optional<ProductResponse> res = productService.updateProduct(jastiperId, productId, req);
@@ -209,7 +202,7 @@ class ProductServiceImplTest {
     @Test
     void testUpdateProduct_OwnerMismatchReturnsEmpty() {
         UUID wrongOwner = UUID.randomUUID();
-        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
 
         Optional<ProductResponse> response = productService.updateProduct(wrongOwner, productId, new ProductUpdateRequest());
 
@@ -222,7 +215,7 @@ class ProductServiceImplTest {
         req.setDescription("New Description");
         req.setStatus("HIDDEN");
 
-        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
         when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
 
         productService.updateProduct(jastiperId, productId, req);
@@ -230,19 +223,6 @@ class ProductServiceImplTest {
         assertEquals("New Description", dummyProduct.getDescription());
         assertEquals(ProductStatus.HIDDEN, dummyProduct.getStatus());
         assertEquals("Test Product", dummyProduct.getName());
-    }
-
-    @Test
-    void testReserveStock_StockBecomesZero() {
-        dummyProduct.setStock(10);
-        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
-        when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
-
-        Optional<ProductResponse> response = productService.reserveStock(productId, 10);
-
-        assertTrue(response.isPresent());
-        assertEquals(0, dummyProduct.getStock());
-        assertEquals(ProductStatus.OUT_OF_STOCK.name(), response.get().getStatus());
     }
 
     @Test
@@ -283,8 +263,7 @@ class ProductServiceImplTest {
                 .findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable)))
                 .thenReturn(productPage);
 
-        var result = productService.searchProductsPublic("keyword", UUID.randomUUID(), 1000L, 50000L, pageable);
-        assertNotNull(result);
+        var result = productService.searchProductsPublic("keyword", UUID.randomUUID(), 1000L, 50000L, null, pageable);        assertNotNull(result);
         verify(((org.springframework.data.jpa.repository.JpaSpecificationExecutor<Product>) productRepository), times(1))
                 .findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable));
     }
@@ -341,5 +320,247 @@ class ProductServiceImplTest {
 
         var result = productService.getMyCatalog(jastiperId, "", "", pageable);
         org.junit.jupiter.api.Assertions.assertNotNull(result);
+    }
+
+    @Test
+    void testUpdateProduct_EmptyRequest_DoesNotUpdateFields() {
+        ProductUpdateRequest req = new ProductUpdateRequest();
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+        when(productRepository.save(any())).thenReturn(dummyProduct);
+
+        productService.updateProduct(jastiperId, productId, req);
+
+        assertEquals("Test Product", dummyProduct.getName());
+    }
+
+    @Test
+    void testUpdateProduct_CategoryNotFound() {
+        ProductUpdateRequest req = new ProductUpdateRequest();
+        req.setCategoryId(999);
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+        when(categoryRepository.findById(999)).thenReturn(Optional.empty());
+        when(productRepository.save(any())).thenReturn(dummyProduct);
+
+        productService.updateProduct(jastiperId, productId, req);
+        assertNotNull(dummyProduct);
+    }
+
+    @Test
+    void testUpdateProduct_SwitchCategory_OldCategoryNull() {
+        ProductUpdateRequest req = new ProductUpdateRequest();
+        req.setCategoryId(2);
+
+        Category newCat = new Category(); newCat.setCategoryId(2); newCat.setProductCount(0);
+        dummyProduct.setCategory(null);
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+        when(categoryRepository.findById(2)).thenReturn(Optional.of(newCat));
+        when(productRepository.save(any())).thenReturn(dummyProduct);
+
+        productService.updateProduct(jastiperId, productId, req);
+
+        assertEquals(1, newCat.getProductCount());
+        assertEquals(newCat, dummyProduct.getCategory());
+    }
+
+    @Test
+    void testUpdateProduct_SameCategory_DoesNothing() {
+        ProductUpdateRequest req = new ProductUpdateRequest();
+        req.setCategoryId(1);
+
+        Category cat = new Category(); cat.setCategoryId(1); cat.setProductCount(5);
+        dummyProduct.setCategory(cat);
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+        when(categoryRepository.findById(1)).thenReturn(Optional.of(cat));
+        when(productRepository.save(any())).thenReturn(dummyProduct);
+
+        productService.updateProduct(jastiperId, productId, req);
+
+        assertEquals(5, cat.getProductCount());
+    }
+
+    @Test
+    void testUpdateProduct_SwitchCategory_OldCategoryNotNullAndDifferent() {
+        ProductUpdateRequest req = new ProductUpdateRequest();
+        req.setCategoryId(2);
+
+        Category oldCat = new Category(); oldCat.setCategoryId(1); oldCat.setProductCount(5);
+        Category newCat = new Category(); newCat.setCategoryId(2); newCat.setProductCount(10);
+
+        dummyProduct.setCategory(oldCat);
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+        when(categoryRepository.findById(2)).thenReturn(Optional.of(newCat));
+        when(productRepository.save(any())).thenReturn(dummyProduct);
+
+        productService.updateProduct(jastiperId, productId, req);
+
+        assertEquals(4, oldCat.getProductCount());
+        assertEquals(11, newCat.getProductCount());
+        assertEquals(newCat, dummyProduct.getCategory());
+    }
+
+    @Test
+    void testCreateProduct_CategoryIdProvidedButNotFound() {
+        ProductCreateRequest req = new ProductCreateRequest();
+        req.setName("New Prod");
+        req.setCategoryId(999);
+        req.setStock(10);
+        req.setPrice(50000L);
+
+        when(categoryRepository.findById(999)).thenReturn(Optional.empty());
+        when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
+
+        ProductResponse response = productService.createProduct(jastiperId, req);
+
+        assertNotNull(response);
+        verify(categoryRepository, times(1)).findById(999);
+    }
+
+    @Test
+    void testDeleteProduct_ThrowsExceptionWhenActiveOrdersExist() {
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+        when(stockReservationRepository.countByProduct_IdAndStatus(productId, ReservationStatus.PENDING)).thenReturn(1L);
+
+        assertThrows(IllegalStateException.class, () -> productService.deleteProduct(jastiperId, productId));
+    }
+
+    @Test
+    void testUpdateProduct_SetStockToZero_ChangesStatusToOutOfStock() {
+        ProductUpdateRequest req = new ProductUpdateRequest();
+        req.setStock(0);
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+        when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
+
+        productService.updateProduct(jastiperId, productId, req);
+
+        assertEquals(0, dummyProduct.getStock());
+        assertEquals(ProductStatus.OUT_OF_STOCK, dummyProduct.getStatus());
+    }
+
+    @Test
+    void testUpdateProduct_SetStockGreaterThanZero_ChangesStatusToActive() {
+        dummyProduct.setStock(0);
+        dummyProduct.setStatus(ProductStatus.OUT_OF_STOCK);
+
+        ProductUpdateRequest req = new ProductUpdateRequest();
+        req.setStock(5);
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+        when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
+
+        productService.updateProduct(jastiperId, productId, req);
+
+        assertEquals(5, dummyProduct.getStock());
+        assertEquals(ProductStatus.ACTIVE, dummyProduct.getStatus());
+    }
+
+    @Test
+    void testUpdateProduct_CategoryIdNotFound_ButOldCategoryExists() {
+        Category oldCat = new Category();
+        oldCat.setCategoryId(1);
+        dummyProduct.setCategory(oldCat);
+
+        ProductUpdateRequest req = new ProductUpdateRequest();
+        req.setCategoryId(999);
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+        when(categoryRepository.findById(999)).thenReturn(Optional.empty());
+        when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
+
+        productService.updateProduct(jastiperId, productId, req);
+
+        assertEquals(oldCat, dummyProduct.getCategory());
+    }
+
+    @Test
+    void testUpdateProduct_SetStockNegative_Branch() {
+        dummyProduct.setStatus(ProductStatus.OUT_OF_STOCK);
+        ProductUpdateRequest req = new ProductUpdateRequest();
+        req.setStock(-5);
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+        when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
+
+        productService.updateProduct(jastiperId, productId, req);
+
+        assertEquals(-5, dummyProduct.getStock());
+    }
+
+    @Test
+    void testUpdateProduct_StockGreaterThanZero_StatusHidden_Branch() {
+        dummyProduct.setStatus(ProductStatus.HIDDEN);
+        dummyProduct.setStock(10);
+        ProductUpdateRequest req = new ProductUpdateRequest();
+        req.setStock(15);
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+        when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
+
+        productService.updateProduct(jastiperId, productId, req);
+
+        assertEquals(ProductStatus.HIDDEN, dummyProduct.getStatus());
+    }
+
+    @Test
+    void testDeleteProduct_Success() {
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+        when(stockReservationRepository.countByProduct_IdAndStatus(productId, ReservationStatus.PENDING)).thenReturn(0L);
+
+        boolean result = productService.deleteProduct(jastiperId, productId);
+
+        assertTrue(result);
+        verify(productRepository, times(1)).save(any(Product.class));
+        assertNotNull(dummyProduct.getDeletedAt());
+    }
+
+    @Test
+    void testDeleteProduct_SuccessWithNullCategory() {
+        dummyProduct.setCategory(null);
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+        when(stockReservationRepository.countByProduct_IdAndStatus(productId, ReservationStatus.PENDING)).thenReturn(0L);
+
+        boolean result = productService.deleteProduct(jastiperId, productId);
+
+        assertTrue(result);
+        assertNotNull(dummyProduct.getDeletedAt());
+    }
+
+    @Test
+    void testDeleteProduct_WithCategory_UpdatesCategoryCount() {
+        Category cat = new Category();
+        cat.setCategoryId(1);
+        cat.setProductCount(5);
+        dummyProduct.setCategory(cat);
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+        when(stockReservationRepository.countByProduct_IdAndStatus(productId, ReservationStatus.PENDING)).thenReturn(0L);
+
+        boolean result = productService.deleteProduct(jastiperId, productId);
+
+        assertTrue(result);
+        assertEquals(4, cat.getProductCount());
+        assertNotNull(dummyProduct.getDeletedAt());
+        verify(categoryRepository).save(cat);
+    }
+
+    @Test
+    void testUpdateProduct_StockGreaterThanZero_StatusAlreadyActive_Branch() {
+        dummyProduct.setStock(5);
+        dummyProduct.setStatus(ProductStatus.ACTIVE);
+
+        ProductUpdateRequest req = new ProductUpdateRequest();
+        req.setStock(15);
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+        when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
+
+        productService.updateProduct(jastiperId, productId, req);
+
+        assertEquals(15, dummyProduct.getStock());
+        assertEquals(ProductStatus.ACTIVE, dummyProduct.getStatus());
     }
 }
