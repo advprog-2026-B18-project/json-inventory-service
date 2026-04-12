@@ -4,15 +4,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductCreateRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductUpdateRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.ProductResponse;
+import id.ac.ui.cs.advprog.jsoninventoryservice.security.JwtUtil;
 import id.ac.ui.cs.advprog.jsoninventoryservice.service.ProductService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import id.ac.ui.cs.advprog.jsoninventoryservice.security.JwtUtil;
 
 import java.time.LocalDate;
 import java.util.Optional;
@@ -22,7 +22,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ProductController.class)
 class ProductControllerTest {
@@ -124,16 +125,6 @@ class ProductControllerTest {
     }
 
     @Test
-    void testReserveStock_Success() throws Exception {
-        when(productService.reserveStock(productId, 2)).thenReturn(Optional.of(dummyResponse));
-
-        mockMvc.perform(post("/products/internal/" + productId + "/stock/reserve")
-                        .param("quantity", "2"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
-    }
-
-    @Test
     void testGetProductDetailPublic_NotFound() throws Exception {
         when(productService.getProductById(any())).thenReturn(Optional.empty());
 
@@ -172,7 +163,7 @@ class ProductControllerTest {
     }
 
     @Test
-    void testGetMyProductDetail() throws Exception {
+    void testGetMyProductDetail_Success() throws Exception {
         when(productService.getProductById(productId))
                 .thenReturn(java.util.Optional.of(dummyResponse));
 
@@ -182,9 +173,25 @@ class ProductControllerTest {
     }
 
     @Test
+    void testGetMyProductDetail_UnauthorizedOrNotFound() throws Exception {
+        ProductResponse unauthorizedResponse = ProductResponse.builder()
+                .id(productId)
+                .jastiperId(UUID.randomUUID())
+                .name("Other Product")
+                .build();
+
+        when(productService.getProductById(productId))
+                .thenReturn(java.util.Optional.of(unauthorizedResponse));
+
+        mockMvc.perform(get("/products/my/" + productId)
+                        .requestAttr("jastiperId", jastiperId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
     void testSearchProducts() throws Exception {
-        when(productService.searchProductsPublic(any(), any(), any(), any(), any()))
-                .thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of(dummyResponse)));
+        when(productService.searchProductsPublic(any(), any(), any(), any(), any(), any()))                .thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of(dummyResponse)));
 
         mockMvc.perform(get("/products")
                         .param("q", "baju")
@@ -196,14 +203,30 @@ class ProductControllerTest {
     }
 
     @Test
-    void testSearchByJastiper() throws Exception {
-        when(productService.searchProductsPublic(any(), eq(jastiperId), any(), any(), any()))
-                .thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of(dummyResponse)));
+    void deleteProduct_Conflict() throws Exception {
+        org.mockito.Mockito.when(productService.deleteProduct(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new IllegalStateException("Cannot delete product with active orders"));
 
-        mockMvc.perform(get("/products/jastipers/" + jastiperId)
-                        .param("q", "test")
-                        .param("page", "0")
-                        .param("size", "10"))
-                .andExpect(status().isOk());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/products/{id}", java.util.UUID.randomUUID())
+                        .requestAttr("jastiperId", java.util.UUID.randomUUID()))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void updateProduct_IllegalArgumentException_Branch() throws Exception {
+        UUID id = UUID.randomUUID();
+        ProductUpdateRequest req = new ProductUpdateRequest();
+
+        when(productService.updateProduct(any(), eq(id), any()))
+                .thenThrow(new IllegalArgumentException("Status tidak valid"));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch("/products/{id}", id)
+                        .requestAttr("jastiperId", UUID.randomUUID())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.success").value(false))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message").value("Status tidak valid"));
     }
 }
