@@ -12,11 +12,10 @@ import java.util.UUID;
 
 @Service
 public class AuthIntegrationServiceImpl implements AuthIntegrationService {
-
     @Value("${modul1.auth.url:http://localhost:8082}")
     private String authServiceUrl;
 
-    private RestTemplate restTemplate;
+    private final RestTemplate restTemplate;
 
     public AuthIntegrationServiceImpl() {
         this.restTemplate = new RestTemplate();
@@ -33,6 +32,13 @@ public class AuthIntegrationServiceImpl implements AuthIntegrationService {
             if (response != null && Boolean.TRUE.equals(response.get("success")) && response.containsKey("data")) {
                 Map<String, Object> data = (Map<String, Object>) response.get("data");
 
+                if (data.containsKey("status") && "BANNED".equalsIgnoreCase(String.valueOf(data.get("status")))) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This Jastiper is not available (BANNED).");
+                }
+                if (data.containsKey("is_active") && Boolean.FALSE.equals(data.get("is_active"))) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This Jastiper is not available (INACTIVE).");
+                }
+
                 String extractedId = null;
                 if (data.containsKey("id")) extractedId = data.get("id").toString();
                 else if (data.containsKey("userId")) extractedId = data.get("userId").toString();
@@ -47,8 +53,25 @@ public class AuthIntegrationServiceImpl implements AuthIntegrationService {
 
         } catch (HttpClientErrorException.NotFound e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Jastiper with username '" + username + "' not found.");
+        } catch (ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to connect to Auth Module. Please ensure it is running.");
         }
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getJastiperProfile(UUID jastiperId) {
+        try {
+            String url = authServiceUrl + "/profile/id/" + jastiperId;
+            Map<String, Object> response = restTemplate.getForObject(url, Map.class);
+            if (response != null && Boolean.TRUE.equals(response.get("success"))) {
+                return (Map<String, Object>) response.get("data");
+            }
+        } catch (Exception e) {
+            return null;
+        }
+        return null;
     }
 }
