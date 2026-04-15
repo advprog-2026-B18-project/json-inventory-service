@@ -7,7 +7,6 @@ import jakarta.validation.constraints.Positive;
 
 @Data
 public class StockReserveRequest {
-
     @JsonProperty("order_id")
     private UUID orderId;
 
