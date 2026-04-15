@@ -11,7 +11,6 @@ import java.security.Key;
 
 @Component
 public class JwtUtil {
-
     @Value("${app.jwt.secret:change-me}")
     private String jwtSecret;
 
@@ -49,6 +48,24 @@ public class JwtUtil {
             return true;
         } catch (Exception ex) {
             return false;
+        }
+    }
+
+    public String getRoleFromToken(String token) {
+        try {
+            Claims claims = Jwts.parserBuilder()
+                    .setSigningKey(getSigningKey())
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
+
+            String role = claims.get("role", String.class);
+            if (role == null) {
+                role = claims.get("user_role", String.class);
+            }
+            return role != null ? role.toUpperCase() : "USER";
+        } catch (Exception e) {
+            return null;
         }
     }
 }
