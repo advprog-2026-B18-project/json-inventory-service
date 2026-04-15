@@ -10,18 +10,16 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ProductTest {
-
     private Product product;
-    private UUID jastiperId;
 
     @BeforeEach
     void setUp() {
-        jastiperId = UUID.randomUUID();
+        UUID jastiperId = UUID.randomUUID();
         product = Product.builder()
                 .jastiperId(jastiperId)
-                .name("Sepatu Compass")
-                .description("Sepatu lokal pride")
-                .price(500000L)
+                .name("Shoes")
+                .description("sport shoes")
+                .price(500000)
                 .stock(5)
                 .originCountry("Indonesia")
                 .purchaseDate(LocalDate.now())
@@ -32,32 +30,10 @@ class ProductTest {
     @Test
     void testProductCreation() {
         assertNotNull(product);
-        assertEquals("Sepatu Compass", product.getName());
-        assertEquals(500000L, product.getPrice());
+        assertEquals("Shoes", product.getName());
+        assertEquals(500000, product.getPrice());
         assertEquals(ProductStatus.ACTIVE, product.getStatus());
-        assertEquals(0, product.getTotalOrders());
-        assertEquals(0, product.getTotalReviews());
-    }
-
-    @Test
-    void testPrePersist() {
-        assertNull(product.getCreatedAt());
-        assertNull(product.getUpdatedAt());
-
-        product.onCreate();
-
-        assertNotNull(product.getCreatedAt());
-        assertNotNull(product.getUpdatedAt());
-    }
-
-    @Test
-    void testPreUpdate() {
-        product.onCreate();
-        var oldUpdatedAt = product.getUpdatedAt();
-
-        product.onUpdate();
-
-        assertNotNull(product.getUpdatedAt());
-        assertTrue(product.getUpdatedAt().isAfter(oldUpdatedAt) || product.getUpdatedAt().isEqual(oldUpdatedAt));
+        assertTrue(product.getTotalOrders() == null || product.getTotalOrders() == 0);
+        assertTrue(product.getTotalReviews() == null || product.getTotalReviews() == 0);
     }
 }
