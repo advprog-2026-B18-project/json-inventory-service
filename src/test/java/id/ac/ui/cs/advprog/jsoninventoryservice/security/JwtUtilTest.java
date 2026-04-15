@@ -13,9 +13,7 @@ import java.util.Base64;
 import static org.junit.jupiter.api.Assertions.*;
 
 class JwtUtilTest {
-
     private JwtUtil jwtUtil;
-
     private final String rawSecret = "ini-isi-ngasal-aja-yang-penting-panjang-minimal-32-karakter-ya";
     private final String secret = Base64.getEncoder().encodeToString(rawSecret.getBytes());
 
@@ -36,7 +34,6 @@ class JwtUtilTest {
                 .setSubject("user-123")
                 .signWith(getSigningKey())
                 .compact();
-
         assertTrue(jwtUtil.validateToken(token));
     }
 
@@ -52,7 +49,6 @@ class JwtUtilTest {
                 .setSubject(expectedId)
                 .signWith(getSigningKey())
                 .compact();
-
         assertEquals(expectedId, jwtUtil.getAccountIdFromToken(token));
     }
 
@@ -63,7 +59,6 @@ class JwtUtilTest {
                 .claim("user_id", expectedId)
                 .signWith(getSigningKey())
                 .compact();
-
         assertEquals(expectedId, jwtUtil.getAccountIdFromToken(token));
     }
 
@@ -74,7 +69,44 @@ class JwtUtilTest {
                 .claim("id", expectedId)
                 .signWith(getSigningKey())
                 .compact();
-
         assertEquals(expectedId, jwtUtil.getAccountIdFromToken(token));
+    }
+
+    @Test
+    void testGetRoleFromToken_WithRoleKey() {
+        String token = Jwts.builder()
+                .setSubject("user-id-123")
+                .claim("role", "ADMIN")
+                .signWith(getSigningKey())
+                .compact();
+        String role = jwtUtil.getRoleFromToken(token);
+        assertEquals("ADMIN", role);
+    }
+
+    @Test
+    void testGetRoleFromToken_WithUserRoleKey() {
+        String token = Jwts.builder()
+                .setSubject("user-id-123")
+                .claim("user_role", "JASTIPER")
+                .signWith(getSigningKey())
+                .compact();
+        String role = jwtUtil.getRoleFromToken(token);
+        assertEquals("JASTIPER", role);
+    }
+
+    @Test
+    void testGetRoleFromToken_MissingRole_ReturnsDefaultUser() {
+        String token = Jwts.builder()
+                .setSubject("user-id-123")
+                .signWith(getSigningKey())
+                .compact();
+        String role = jwtUtil.getRoleFromToken(token);
+        assertEquals("USER", role);
+    }
+
+    @Test
+    void testGetRoleFromToken_InvalidToken_ReturnsNull() {
+        String role = jwtUtil.getRoleFromToken("ini.token.yang.sangat.sangat.ngasal");
+        assertNull(role, "If the token fails to parse, it should return null");
     }
 }

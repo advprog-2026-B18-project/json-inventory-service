@@ -7,7 +7,6 @@ import java.util.UUID;
 
 @Data
 public class StockReleaseRequest {
-
     @JsonProperty("order_id")
     private UUID orderId;
 

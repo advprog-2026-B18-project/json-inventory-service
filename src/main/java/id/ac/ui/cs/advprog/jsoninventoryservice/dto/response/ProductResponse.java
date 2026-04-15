@@ -1,54 +1,85 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.dto.response;
-import id.ac.ui.cs.advprog.jsoninventoryservice.model.Product;
 
-import lombok.Builder;
-import lombok.Data;
+import id.ac.ui.cs.advprog.jsoninventoryservice.model.Product;
+import lombok.*;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class ProductResponse {
-    private UUID id;
-    private UUID jastiperId;
+    private UUID productId;
     private String name;
     private String description;
-    private Long price;
-    private Integer stock;
+    private long price;
+    private int stock;
+    private String status;
     private String originCountry;
     private LocalDate purchaseDate;
+    private Integer weightGram;
+    private Long serviceFee;
     private List<String> images;
     private List<String> tags;
-    private String status;
-    private Double avgRating;
-    private Integer totalOrders;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private Long serviceFee;
-    private Integer weightGram;
+    private CategoryInfo category;
+    private JastiperInfo jastiper;
+    private ProductStats stats;
 
-    public static ProductResponse fromEntity(Product product) {
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CategoryInfo {
+        private Integer id;
+        private String name;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class JastiperInfo {
+        private UUID userId;
+        private String username;
+        private String fullName;
+        private String profilePictureUrl;
+        private Double avgRating;
+        private Integer totalOrders;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ProductStats {
+        private Integer totalOrders;
+        private Integer totalReviews;
+        private Double avgRating;
+    }
+
+    public static ProductResponse fromEntity(Product p) {
         return ProductResponse.builder()
-                .id(product.getId())
-                .jastiperId(product.getJastiperId())
-                .name(product.getName())
-                .description(product.getDescription())
-                .price(product.getPrice())
-                .stock(product.getStock())
-                .originCountry(product.getOriginCountry())
-                .purchaseDate(product.getPurchaseDate())
-                .images(product.getImages() != null ? new ArrayList<>(product.getImages()) : new ArrayList<>())
-                .tags(product.getTags() != null ? new ArrayList<>(product.getTags()) : new ArrayList<>())
-                .status(product.getStatus().name())
-                .avgRating(product.getAvgRating())
-                .totalOrders(product.getTotalOrders())
-                .createdAt(product.getCreatedAt())
-                .updatedAt(product.getUpdatedAt())
-                .serviceFee(product.getServiceFee())
-                .weightGram(product.getWeightGram())
+                .productId(p.getProductId())
+                .name(p.getName())
+                .description(p.getDescription())
+                .price(p.getPrice())
+                .stock(p.getStock())
+                .status(p.getStatus() != null ? p.getStatus().name() : null)
+                .originCountry(p.getOriginCountry())
+                .purchaseDate(p.getPurchaseDate())
+                .weightGram(p.getWeightGram())
+                .serviceFee(p.getServiceFee() != null ? p.getServiceFee().longValue() : null)
+                .images(p.getImages())
+                .tags(p.getTags())
+                .stats(ProductStats.builder()
+                        .totalOrders(p.getTotalOrders() != null ? p.getTotalOrders() : 0)
+                        .totalReviews(p.getTotalReviews() != null ? p.getTotalReviews() : 0)
+                        .avgRating(p.getAvgRating() != null ? p.getAvgRating() : 0.0)
+                        .build())
+                .jastiper(JastiperInfo.builder().userId(p.getJastiperId()).build())
+                .category(p.getCategoryId() != null ? CategoryInfo.builder().id(p.getCategoryId()).build() : null)
                 .build();
     }
 }
