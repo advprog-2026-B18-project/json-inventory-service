@@ -3,10 +3,11 @@ package id.ac.ui.cs.advprog.jsoninventoryservice.service;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductCreateRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductUpdateRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.ProductResponse;
+import id.ac.ui.cs.advprog.jsoninventoryservice.exception.ActiveOrderException;
+import id.ac.ui.cs.advprog.jsoninventoryservice.exception.UnauthorizedAccessException;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.Category;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.Product;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
-import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ReservationStatus;
 import id.ac.ui.cs.advprog.jsoninventoryservice.repository.CategoryRepository;
 import id.ac.ui.cs.advprog.jsoninventoryservice.repository.ProductRepository;
 import id.ac.ui.cs.advprog.jsoninventoryservice.repository.StockReservationRepository;
@@ -15,12 +16,18 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.time.LocalDateTime;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -29,9 +36,11 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 @SuppressWarnings("unchecked")
 class ProductServiceImplTest {
-
     @Mock
     private ProductRepository productRepository;
+
+    @Mock
+    private AuthIntegrationService authIntegrationService;
 
     @Mock
     private CategoryRepository categoryRepository;
@@ -51,11 +60,11 @@ class ProductServiceImplTest {
         jastiperId = UUID.randomUUID();
         productId = UUID.randomUUID();
         dummyProduct = Product.builder()
-                .id(productId)
+                .productId(productId)
                 .jastiperId(jastiperId)
                 .name("Test Product")
                 .description("Desc")
-                .price(100L)
+                .price(100)
                 .stock(10)
                 .originCountry("ID")
                 .purchaseDate(LocalDate.now())
@@ -73,9 +82,7 @@ class ProductServiceImplTest {
         req.setPurchaseDate(LocalDate.now());
 
         when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
-
         ProductResponse response = productService.createProduct(jastiperId, req);
-
         assertNotNull(response);
         assertEquals("Test Product", response.getName());
         verify(productRepository, times(1)).save(any(Product.class));
@@ -98,11 +105,11 @@ class ProductServiceImplTest {
 
         Category dummyCategory = new Category();
         dummyCategory.setCategoryId(1);
+        dummyCategory.setProductCount(0);
         when(categoryRepository.findById(1)).thenReturn(Optional.of(dummyCategory));
         when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
 
         ProductResponse response = productService.createProduct(jastiperId, req);
-
         assertNotNull(response);
         verify(categoryRepository, times(1)).findById(1);
     }
@@ -117,7 +124,6 @@ class ProductServiceImplTest {
         when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
 
         Optional<ProductResponse> response = productService.updateProduct(jastiperId, productId, req);
-
         assertTrue(response.isPresent());
         assertEquals("Updated Name", dummyProduct.getName());
         assertEquals(20, dummyProduct.getStock());
@@ -127,30 +133,20 @@ class ProductServiceImplTest {
     void testUpdateProduct_FailWrongOwner() {
         UUID wrongJastiperId = UUID.randomUUID();
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
-
-        Optional<ProductResponse> response = productService.updateProduct(wrongJastiperId, productId, new ProductUpdateRequest());
-
-        assertFalse(response.isPresent());
-        verify(productRepository, never()).save(any(Product.class));
+        assertThrows(UnauthorizedAccessException.class, () -> productService.updateProduct(wrongJastiperId, productId, new ProductUpdateRequest()));
     }
 
     @Test
     void testDeleteProduct_FailWrongOwner() {
         UUID wrongJastiperId = UUID.randomUUID();
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
-
-        boolean result = productService.deleteProduct(wrongJastiperId, productId);
-
-        assertFalse(result);
-        verify(productRepository, never()).save(any(Product.class));
+        assertThrows(UnauthorizedAccessException.class, () -> productService.deleteProduct(wrongJastiperId, productId));
     }
 
     @Test
     void testGetProductById_Found() {
         when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
-
         Optional<ProductResponse> response = productService.getProductById(productId);
-
         assertTrue(response.isPresent());
         assertEquals("Test Product", response.get().getName());
     }
@@ -158,9 +154,7 @@ class ProductServiceImplTest {
     @Test
     void testGetProductById_NotFound() {
         when(productRepository.findById(any())).thenReturn(Optional.empty());
-
         Optional<ProductResponse> response = productService.getProductById(UUID.randomUUID());
-
         assertFalse(response.isPresent());
     }
 
@@ -175,13 +169,11 @@ class ProductServiceImplTest {
 
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
         when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
-
         Optional<ProductResponse> res = productService.updateProduct(jastiperId, productId, req);
-
         assertTrue(res.isPresent());
         assertEquals("New Name", dummyProduct.getName());
         assertEquals("New Desc", dummyProduct.getDescription());
-        assertEquals(99L, dummyProduct.getPrice());
+        assertEquals(99, dummyProduct.getPrice());
         assertEquals(50, dummyProduct.getStock());
         assertEquals(ProductStatus.OUT_OF_STOCK, dummyProduct.getStatus());
     }
@@ -193,20 +185,16 @@ class ProductServiceImplTest {
         when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
 
         Optional<ProductResponse> res = productService.getProductById(productId);
-
         assertTrue(res.isPresent());
-        assertNotNull(res.get().getImages());
-        assertNotNull(res.get().getTags());
+        assertNull(res.get().getImages());
+        assertNull(res.get().getTags());
     }
 
     @Test
     void testUpdateProduct_OwnerMismatchReturnsEmpty() {
-        UUID wrongOwner = UUID.randomUUID();
+        UUID wrongJastiperId = UUID.randomUUID();
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
-
-        Optional<ProductResponse> response = productService.updateProduct(wrongOwner, productId, new ProductUpdateRequest());
-
-        assertTrue(response.isEmpty());
+        assertThrows(UnauthorizedAccessException.class, () -> productService.updateProduct(wrongJastiperId, productId, new ProductUpdateRequest()));
     }
 
     @Test
@@ -217,7 +205,6 @@ class ProductServiceImplTest {
 
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
         when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
-
         productService.updateProduct(jastiperId, productId, req);
 
         assertEquals("New Description", dummyProduct.getDescription());
@@ -232,94 +219,65 @@ class ProductServiceImplTest {
         when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
 
         Optional<ProductResponse> response = productService.getProductById(productId);
-
         assertTrue(response.isPresent());
-        assertNotNull(response.get().getImages());
-        assertTrue(response.get().getImages().isEmpty());
+        assertNull(response.get().getImages());
     }
-
     @Test
     void testGetMyCatalog() {
-        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
-        org.springframework.data.domain.Page<Product> productPage = new org.springframework.data.domain.PageImpl<>(java.util.List.of(dummyProduct));
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Product> productPage = new PageImpl<>(List.of(dummyProduct));
 
-        when(productRepository
-                .findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable)))
-                .thenReturn(productPage);
-
+        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
         var result = productService.getMyCatalog(jastiperId, "Test", "ACTIVE", pageable);
-
         assertNotNull(result);
-        verify(((org.springframework.data.jpa.repository.JpaSpecificationExecutor<Product>) productRepository), times(1))
-                .findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable));
+        verify(((JpaSpecificationExecutor<Product>) productRepository), times(1)).findAll(any(Specification.class), eq(pageable));
     }
 
     @Test
     void testSearchProductsPublic() {
-        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
-        org.springframework.data.domain.Page<Product> productPage = new org.springframework.data.domain.PageImpl<>(List.of(dummyProduct));
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Product> productPage = new PageImpl<>(List.of(dummyProduct));
 
-        when(productRepository
-                .findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable)))
-                .thenReturn(productPage);
-
-        var result = productService.searchProductsPublic("keyword", UUID.randomUUID(), 1000L, 50000L, null, pageable);        assertNotNull(result);
-        verify(((org.springframework.data.jpa.repository.JpaSpecificationExecutor<Product>) productRepository), times(1))
-                .findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable));
+        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
+        var result = productService.searchProductsPublic("keyword", UUID.randomUUID(), 1000L, 50000L, null, null, null, null, pageable);
+        assertNotNull(result);
+        verify(((JpaSpecificationExecutor<Product>) productRepository), times(1)).findAll(any(Specification.class), eq(pageable));
     }
 
     @Test
     void testGetMyCatalog_WithNullFilters() {
-        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
-        org.springframework.data.domain.Page<Product> productPage = new org.springframework.data.domain.PageImpl<>(java.util.List.of(dummyProduct));
-
-        when(productRepository
-                .findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable)))
-                .thenReturn(productPage);
-
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Product> productPage = new PageImpl<>(List.of(dummyProduct));
+        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
         var result = productService.getMyCatalog(jastiperId, null, null, pageable);
         assertNotNull(result);
-        verify(((org.springframework.data.jpa.repository.JpaSpecificationExecutor<Product>) productRepository), times(1))
-                .findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable));
     }
 
     @Test
     void testGetMyCatalog_WithOnlySearchQuery() {
-        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
-        org.springframework.data.domain.Page<Product> productPage = new org.springframework.data.domain.PageImpl<>(java.util.List.of(dummyProduct));
-
-        when(productRepository
-                .findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable)))
-                .thenReturn(productPage);
-
-        var result = productService.getMyCatalog(jastiperId, "sepatu", null, pageable);
-        org.junit.jupiter.api.Assertions.assertNotNull(result);
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Product> productPage = new PageImpl<>(List.of(dummyProduct));
+        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
+        var result = productService.getMyCatalog(jastiperId, "shoes", null, pageable);
+        assertNotNull(result);
     }
 
     @Test
     void testGetMyCatalog_WithOnlyStatus() {
-        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
-        org.springframework.data.domain.Page<Product> productPage = new org.springframework.data.domain.PageImpl<>(java.util.List.of(dummyProduct));
-
-        when(productRepository
-                .findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable)))
-                .thenReturn(productPage);
-
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Product> productPage = new PageImpl<>(List.of(dummyProduct));
+        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
         var result = productService.getMyCatalog(jastiperId, null, "ACTIVE", pageable);
-        org.junit.jupiter.api.Assertions.assertNotNull(result);
+        assertNotNull(result);
     }
 
     @Test
     void testGetMyCatalog_WithEmptyStrings() {
-        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
-        org.springframework.data.domain.Page<Product> productPage = new org.springframework.data.domain.PageImpl<>(java.util.List.of(dummyProduct));
-
-        when(productRepository
-                .findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable)))
-                .thenReturn(productPage);
-
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Product> productPage = new PageImpl<>(List.of(dummyProduct));
+        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
         var result = productService.getMyCatalog(jastiperId, "", "", pageable);
-        org.junit.jupiter.api.Assertions.assertNotNull(result);
+        assertNotNull(result);
     }
 
     @Test
@@ -327,9 +285,7 @@ class ProductServiceImplTest {
         ProductUpdateRequest req = new ProductUpdateRequest();
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
         when(productRepository.save(any())).thenReturn(dummyProduct);
-
         productService.updateProduct(jastiperId, productId, req);
-
         assertEquals("Test Product", dummyProduct.getName());
     }
 
@@ -337,11 +293,9 @@ class ProductServiceImplTest {
     void testUpdateProduct_CategoryNotFound() {
         ProductUpdateRequest req = new ProductUpdateRequest();
         req.setCategoryId(999);
-
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
         when(categoryRepository.findById(999)).thenReturn(Optional.empty());
         when(productRepository.save(any())).thenReturn(dummyProduct);
-
         productService.updateProduct(jastiperId, productId, req);
         assertNotNull(dummyProduct);
     }
@@ -350,34 +304,32 @@ class ProductServiceImplTest {
     void testUpdateProduct_SwitchCategory_OldCategoryNull() {
         ProductUpdateRequest req = new ProductUpdateRequest();
         req.setCategoryId(2);
-
-        Category newCat = new Category(); newCat.setCategoryId(2); newCat.setProductCount(0);
-        dummyProduct.setCategory(null);
+        Category newCat = new Category();
+        newCat.setCategoryId(2);
+        newCat.setProductCount(0);
+        dummyProduct.setCategoryId(null);
 
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
         when(categoryRepository.findById(2)).thenReturn(Optional.of(newCat));
         when(productRepository.save(any())).thenReturn(dummyProduct);
-
         productService.updateProduct(jastiperId, productId, req);
-
         assertEquals(1, newCat.getProductCount());
-        assertEquals(newCat, dummyProduct.getCategory());
+        assertEquals(2, dummyProduct.getCategoryId());
     }
 
     @Test
     void testUpdateProduct_SameCategory_DoesNothing() {
         ProductUpdateRequest req = new ProductUpdateRequest();
         req.setCategoryId(1);
-
-        Category cat = new Category(); cat.setCategoryId(1); cat.setProductCount(5);
-        dummyProduct.setCategory(cat);
+        Category cat = new Category();
+        cat.setCategoryId(1);
+        cat.setProductCount(5);
+        dummyProduct.setCategoryId(1);
 
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
         when(categoryRepository.findById(1)).thenReturn(Optional.of(cat));
         when(productRepository.save(any())).thenReturn(dummyProduct);
-
         productService.updateProduct(jastiperId, productId, req);
-
         assertEquals(5, cat.getProductCount());
     }
 
@@ -385,21 +337,23 @@ class ProductServiceImplTest {
     void testUpdateProduct_SwitchCategory_OldCategoryNotNullAndDifferent() {
         ProductUpdateRequest req = new ProductUpdateRequest();
         req.setCategoryId(2);
-
-        Category oldCat = new Category(); oldCat.setCategoryId(1); oldCat.setProductCount(5);
-        Category newCat = new Category(); newCat.setCategoryId(2); newCat.setProductCount(10);
-
-        dummyProduct.setCategory(oldCat);
+        Category oldCat = new Category();
+        oldCat.setCategoryId(1);
+        oldCat.setProductCount(5);
+        Category newCat = new Category();
+        newCat.setCategoryId(2);
+        newCat.setProductCount(10);
+        dummyProduct.setCategoryId(1);
 
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+        when(categoryRepository.findById(1)).thenReturn(Optional.of(oldCat));
         when(categoryRepository.findById(2)).thenReturn(Optional.of(newCat));
         when(productRepository.save(any())).thenReturn(dummyProduct);
-
         productService.updateProduct(jastiperId, productId, req);
 
         assertEquals(4, oldCat.getProductCount());
         assertEquals(11, newCat.getProductCount());
-        assertEquals(newCat, dummyProduct.getCategory());
+        assertEquals(2, dummyProduct.getCategoryId());
     }
 
     @Test
@@ -414,17 +368,8 @@ class ProductServiceImplTest {
         when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
 
         ProductResponse response = productService.createProduct(jastiperId, req);
-
         assertNotNull(response);
         verify(categoryRepository, times(1)).findById(999);
-    }
-
-    @Test
-    void testDeleteProduct_ThrowsExceptionWhenActiveOrdersExist() {
-        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
-        when(stockReservationRepository.countByProduct_IdAndStatus(productId, ReservationStatus.PENDING)).thenReturn(1L);
-
-        assertThrows(IllegalStateException.class, () -> productService.deleteProduct(jastiperId, productId));
     }
 
     @Test
@@ -434,9 +379,7 @@ class ProductServiceImplTest {
 
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
         when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
-
         productService.updateProduct(jastiperId, productId, req);
-
         assertEquals(0, dummyProduct.getStock());
         assertEquals(ProductStatus.OUT_OF_STOCK, dummyProduct.getStatus());
     }
@@ -445,35 +388,27 @@ class ProductServiceImplTest {
     void testUpdateProduct_SetStockGreaterThanZero_ChangesStatusToActive() {
         dummyProduct.setStock(0);
         dummyProduct.setStatus(ProductStatus.OUT_OF_STOCK);
-
         ProductUpdateRequest req = new ProductUpdateRequest();
         req.setStock(5);
 
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
         when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
-
         productService.updateProduct(jastiperId, productId, req);
-
         assertEquals(5, dummyProduct.getStock());
         assertEquals(ProductStatus.ACTIVE, dummyProduct.getStatus());
     }
 
     @Test
     void testUpdateProduct_CategoryIdNotFound_ButOldCategoryExists() {
-        Category oldCat = new Category();
-        oldCat.setCategoryId(1);
-        dummyProduct.setCategory(oldCat);
-
+        dummyProduct.setCategoryId(1);
         ProductUpdateRequest req = new ProductUpdateRequest();
         req.setCategoryId(999);
 
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
         when(categoryRepository.findById(999)).thenReturn(Optional.empty());
         when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
-
         productService.updateProduct(jastiperId, productId, req);
-
-        assertEquals(oldCat, dummyProduct.getCategory());
+        assertEquals(1, dummyProduct.getCategoryId());
     }
 
     @Test
@@ -484,9 +419,7 @@ class ProductServiceImplTest {
 
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
         when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
-
         productService.updateProduct(jastiperId, productId, req);
-
         assertEquals(-5, dummyProduct.getStock());
     }
 
@@ -499,19 +432,91 @@ class ProductServiceImplTest {
 
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
         when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
-
         productService.updateProduct(jastiperId, productId, req);
-
         assertEquals(ProductStatus.HIDDEN, dummyProduct.getStatus());
+    }
+
+    @Test
+    void testUpdateProduct_StockGreaterThanZero_StatusAlreadyActive_Branch() {
+        dummyProduct.setStock(5);
+        dummyProduct.setStatus(ProductStatus.ACTIVE);
+        ProductUpdateRequest req = new ProductUpdateRequest();
+        req.setStock(15);
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+        when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
+        productService.updateProduct(jastiperId, productId, req);
+        assertEquals(15, dummyProduct.getStock());
+        assertEquals(ProductStatus.ACTIVE, dummyProduct.getStatus());
+    }
+
+    @Test
+    void testGetProductById_HiddenProduct_ReturnsEmpty() {
+        UUID productId = UUID.randomUUID();
+        Product hiddenProduct = new Product();
+        hiddenProduct.setProductId(productId);
+        hiddenProduct.setStatus(ProductStatus.HIDDEN);
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(hiddenProduct));
+        Optional<ProductResponse> result = productService.getProductById(productId);
+        assertTrue(result.isEmpty(), "The public may not see products with HIDDEN status");
+    }
+
+    @Test
+    void testGetProductById_SoftDeletedProduct_ReturnsEmpty() {
+        UUID productId = UUID.randomUUID();
+        Product deletedProduct = new Product();
+        deletedProduct.setProductId(productId);
+        deletedProduct.setStatus(ProductStatus.ACTIVE);
+        deletedProduct.setDeletedAt(LocalDateTime.now());
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(deletedProduct));
+        Optional<ProductResponse> result = productService.getProductById(productId);
+        assertTrue(result.isEmpty(), "The public should not see products that have been removed");
+    }
+
+    @Test
+    void testGetProductById_OutOfStockProduct_ReturnsProduct() {
+        UUID productId = UUID.randomUUID();
+        Product outProduct = new Product();
+        outProduct.setProductId(productId);
+        outProduct.setStatus(ProductStatus.OUT_OF_STOCK);
+        outProduct.setPrice(100000);
+        outProduct.setStock(0);
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(outProduct));
+        Optional<ProductResponse> result = productService.getProductById(productId);
+        assertTrue(result.isPresent());
+    }
+
+    @Test
+    void testCreateProduct_WithNullPriceAndServiceFee() {
+        ProductCreateRequest req = new ProductCreateRequest();
+        req.setName("Product Name");
+        req.setPrice(null);
+        req.setServiceFee(null);
+        req.setStock(5);
+        req.setOriginCountry("Indonesia");
+        req.setPurchaseDate(LocalDate.now());
+
+        when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
+        ProductResponse response = productService.createProduct(jastiperId, req);
+        assertNotNull(response);
+        verify(productRepository, times(1)).save(any(Product.class));
+    }
+
+    @Test
+    void testDeleteProduct_ThrowsExceptionWhenActiveOrdersExist() {
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+        when(stockReservationRepository.countByProductProductIdAndStatusIn(eq(productId), anyList())).thenReturn(1L);
+        assertThrows(ActiveOrderException.class, () -> productService.deleteProduct(jastiperId, productId));
     }
 
     @Test
     void testDeleteProduct_Success() {
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
-        when(stockReservationRepository.countByProduct_IdAndStatus(productId, ReservationStatus.PENDING)).thenReturn(0L);
-
+        when(stockReservationRepository.countByProductProductIdAndStatusIn(eq(productId), anyList())).thenReturn(0L);
         boolean result = productService.deleteProduct(jastiperId, productId);
-
         assertTrue(result);
         verify(productRepository, times(1)).save(any(Product.class));
         assertNotNull(dummyProduct.getDeletedAt());
@@ -519,12 +524,10 @@ class ProductServiceImplTest {
 
     @Test
     void testDeleteProduct_SuccessWithNullCategory() {
-        dummyProduct.setCategory(null);
+        dummyProduct.setCategoryId(null);
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
-        when(stockReservationRepository.countByProduct_IdAndStatus(productId, ReservationStatus.PENDING)).thenReturn(0L);
-
+        when(stockReservationRepository.countByProductProductIdAndStatusIn(eq(productId), anyList())).thenReturn(0L);
         boolean result = productService.deleteProduct(jastiperId, productId);
-
         assertTrue(result);
         assertNotNull(dummyProduct.getDeletedAt());
     }
@@ -534,13 +537,13 @@ class ProductServiceImplTest {
         Category cat = new Category();
         cat.setCategoryId(1);
         cat.setProductCount(5);
-        dummyProduct.setCategory(cat);
+        dummyProduct.setCategoryId(1);
 
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
-        when(stockReservationRepository.countByProduct_IdAndStatus(productId, ReservationStatus.PENDING)).thenReturn(0L);
+        when(categoryRepository.findById(1)).thenReturn(Optional.of(cat));
+        when(stockReservationRepository.countByProductProductIdAndStatusIn(eq(productId), anyList())).thenReturn(0L);
 
         boolean result = productService.deleteProduct(jastiperId, productId);
-
         assertTrue(result);
         assertEquals(4, cat.getProductCount());
         assertNotNull(dummyProduct.getDeletedAt());
@@ -548,19 +551,288 @@ class ProductServiceImplTest {
     }
 
     @Test
-    void testUpdateProduct_StockGreaterThanZero_StatusAlreadyActive_Branch() {
-        dummyProduct.setStock(5);
-        dummyProduct.setStatus(ProductStatus.ACTIVE);
+    void testDeleteProduct_FailNotFound() {
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> productService.deleteProduct(jastiperId, productId));
+    }
 
+    @Test
+    void testGetMyCatalog_WithEmptyImages() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Product emptyImageProduct = new Product();
+        emptyImageProduct.setProductId(UUID.randomUUID());
+        emptyImageProduct.setImages(new ArrayList<>());
+        emptyImageProduct.setPrice(100000);
+        emptyImageProduct.setStock(5);
+        Page<Product> productPage = new PageImpl<>(List.of(emptyImageProduct));
+
+        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
+        var result = productService.getMyCatalog(jastiperId, null, null, pageable);
+        assertNotNull(result);
+        assertTrue(result.getContent().getFirst().getImages().isEmpty());
+    }
+
+    @Test
+    void testUpdateProduct_WithPhase4Parameters() {
         ProductUpdateRequest req = new ProductUpdateRequest();
-        req.setStock(15);
+        req.setOriginCountry("US");
+        req.setPurchaseDate(LocalDate.now());
+        req.setServiceFee(5000L);
+        req.setWeightGram(100);
+        req.setImages(List.of("img1.jpg"));
+        req.setTags(List.of("tag1"));
 
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
         when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
+        Optional<ProductResponse> res = productService.updateProduct(jastiperId, productId, req);
+        assertTrue(res.isPresent());
+        assertEquals("US", dummyProduct.getOriginCountry());
+        assertEquals(5000, dummyProduct.getServiceFee());
+    }
 
-        productService.updateProduct(jastiperId, productId, req);
+    @Test
+    void testGetMyCatalog_WithNullImages_Branch() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Product nullImageProduct = new Product();
+        nullImageProduct.setProductId(UUID.randomUUID());
+        nullImageProduct.setPrice(50000);
+        nullImageProduct.setStock(10);
+        nullImageProduct.setImages(null);
+        Page<Product> productPage = new PageImpl<>(List.of(nullImageProduct));
 
-        assertEquals(15, dummyProduct.getStock());
-        assertEquals(ProductStatus.ACTIVE, dummyProduct.getStatus());
+        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
+        var result = productService.getMyCatalog(jastiperId, null, null, pageable);
+        assertNotNull(result);
+        assertNull(result.getContent().getFirst().getImages());
+    }
+
+    @Test
+    void testGetMyCatalog_WithPopulatedImages_Branch() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Product populatedImageProduct = new Product();
+        populatedImageProduct.setProductId(UUID.randomUUID());
+        populatedImageProduct.setPrice(50000);
+        populatedImageProduct.setStock(10);
+        populatedImageProduct.setImages(new ArrayList<>(List.of("img1.jpg", "img2.jpg")));
+        Page<Product> productPage = new PageImpl<>(List.of(populatedImageProduct));
+
+        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
+        var result = productService.getMyCatalog(jastiperId, null, null, pageable);
+        assertNotNull(result);
+        assertEquals(1, result.getContent().getFirst().getImages().size());
+        assertEquals("img1.jpg", result.getContent().getFirst().getImages().getFirst());
+    }
+
+    @Test
+    void testGetProductById_Success_WithEnrichment() {
+        UUID productId = UUID.randomUUID();
+        UUID jastiperId = UUID.randomUUID();
+        Product product = new Product();
+        product.setProductId(productId);
+        product.setJastiperId(jastiperId);
+        product.setCategoryId(1);
+        product.setStatus(ProductStatus.ACTIVE);
+        product.setPrice(100000);
+        product.setStock(10);
+        Category category = new Category();
+        category.setCategoryId(1);
+        category.setName("Electronics");
+        Map<String, Object> mockProfile = new HashMap<>();
+        mockProfile.put("username", "jastiper123");
+        mockProfile.put("status", "ACTIVE");
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+        when(categoryRepository.findById(1)).thenReturn(Optional.of(category));
+        when(authIntegrationService.getJastiperProfile(jastiperId)).thenReturn(mockProfile);
+
+        Optional<ProductResponse> result = productService.getProductById(productId);
+        assertTrue(result.isPresent());
+        assertEquals("Electronics", result.get().getCategory().getName());
+        assertEquals("jastiper123", result.get().getJastiper().getUsername());
+    }
+
+    @Test
+    void testGetProductById_JastiperBanned_ReturnsEmpty() {
+        UUID productId = UUID.randomUUID();
+        Product product = new Product();
+        product.setProductId(productId);
+        product.setJastiperId(UUID.randomUUID());
+        product.setStatus(ProductStatus.ACTIVE);
+        Map<String, Object> bannedProfile = new HashMap<>();
+        bannedProfile.put("status", "BANNED");
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+        when(authIntegrationService.getJastiperProfile(product.getJastiperId())).thenReturn(bannedProfile);
+
+        Optional<ProductResponse> result = productService.getProductById(productId);
+        assertFalse(result.isPresent());
+    }
+
+    @Test
+    void testGetProductById_ProfileExistsButMissingAvgRating() {
+        dummyProduct.setPrice(100);
+        dummyProduct.setStock(10);
+        dummyProduct.setCategoryId(1);
+        Category c = new Category();
+        c.setName("Category Test");
+        Map<String, Object> profile = new HashMap<>();
+        profile.put("username", "testuser");
+        profile.put("status", "ACTIVE");
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
+        when(categoryRepository.findById(1)).thenReturn(Optional.of(c));
+        when(authIntegrationService.getJastiperProfile(jastiperId)).thenReturn(profile);
+
+        Optional<ProductResponse> res = productService.getProductById(productId);
+        assertTrue(res.isPresent());
+        assertNull(res.get().getJastiper().getAvgRating());
+    }
+
+    @Test
+    void testGetProductById_ProfileMissingStatusKey() {
+        dummyProduct.setPrice(100);
+        dummyProduct.setStock(10);
+        Map<String, Object> profile = new HashMap<>();
+        profile.put("username", "testuser");
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
+        when(authIntegrationService.getJastiperProfile(jastiperId)).thenReturn(profile);
+        Optional<ProductResponse> res = productService.getProductById(productId);
+        assertTrue(res.isPresent());
+    }
+
+    @Test
+    void testGetProductById_CategoryNull() {
+        dummyProduct.setPrice(100);
+        dummyProduct.setStock(10);
+        dummyProduct.setCategoryId(null);
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
+        when(authIntegrationService.getJastiperProfile(jastiperId)).thenReturn(null);
+        Optional<ProductResponse> res = productService.getProductById(productId);
+        assertTrue(res.isPresent());
+        assertNull(res.get().getCategory());
+    }
+
+    @Test
+    void testGetProductById_ProfileContainsTotalOrders() {
+        dummyProduct.setCategoryId(1);
+        dummyProduct.setPrice(100);
+        dummyProduct.setStock(10);
+        Category c = new Category();
+        c.setName("Test Category");
+
+        Map<String, Object> profile = new HashMap<>();
+        profile.put("username", "testuser");
+        profile.put("full_name", "Test User");
+        profile.put("profile_picture_url", "https://image.com");
+        profile.put("avg_rating", 4.5);
+        profile.put("total_orders", 20);
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
+        when(categoryRepository.findById(1)).thenReturn(Optional.of(c));
+        when(authIntegrationService.getJastiperProfile(jastiperId)).thenReturn(profile);
+
+        Optional<ProductResponse> res = productService.getProductById(productId);
+        assertTrue(res.isPresent());
+        assertNotNull(res.get().getJastiper());
+    }
+
+    @Test
+    void testGetProductById_AuthServiceThrowsException() {
+        dummyProduct.setCategoryId(1);
+        dummyProduct.setPrice(100);
+        dummyProduct.setStock(10);
+        Category c = new Category();
+        c.setName("Test Category");
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
+        when(authIntegrationService.getJastiperProfile(jastiperId)).thenThrow(new RuntimeException("Auth Service Down"));
+
+        try {
+            Optional<ProductResponse> res = productService.getProductById(productId);
+            assertTrue(res.isPresent());
+            assertNotNull(res.get().getJastiper());
+        } catch (RuntimeException e) {
+            assertEquals("Auth Service Down", e.getMessage());
+        }
+    }
+
+    @Test
+    void testGetProductById_AuthServiceReturnsNull() {
+        dummyProduct.setCategoryId(1);
+        dummyProduct.setPrice(100);
+        dummyProduct.setStock(10);
+        Category c = new Category();
+        c.setName("Test Category");
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
+        when(categoryRepository.findById(1)).thenReturn(Optional.of(c));
+        when(authIntegrationService.getJastiperProfile(jastiperId)).thenReturn(null);
+
+        Optional<ProductResponse> res = productService.getProductById(productId);
+        assertTrue(res.isPresent());
+    }
+
+    @Test
+    void testGetProductById_CategoryNullSafeBranch() {
+        Product spyProduct = spy(new Product());
+        spyProduct.setProductId(productId);
+        spyProduct.setJastiperId(jastiperId);
+        spyProduct.setStatus(ProductStatus.ACTIVE);
+        spyProduct.setPrice(100);
+        spyProduct.setStock(10);
+
+        when(spyProduct.getCategoryId()).thenReturn(null, 1, 1);
+
+        Category c = new Category();
+        c.setName("Spy Category");
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(spyProduct));
+        when(categoryRepository.findById(1)).thenReturn(Optional.of(c));
+        when(authIntegrationService.getJastiperProfile(jastiperId)).thenReturn(new HashMap<>());
+
+        Optional<ProductResponse> res = productService.getProductById(productId);
+        assertTrue(res.isPresent());
+        assertEquals("Spy Category", res.get().getCategory().getName());
+    }
+
+    @Test
+    void testGetProductById_AuthServiceThrowsException_CaughtGracefully() {
+        UUID prodId = UUID.randomUUID();
+        Product dummy = new Product();
+        dummy.setProductId(prodId);
+        dummy.setJastiperId(UUID.randomUUID());
+        dummy.setStatus(ProductStatus.ACTIVE);
+        dummy.setPrice(100000);
+        dummy.setStock(10);
+
+        when(productRepository.findById(prodId)).thenReturn(Optional.of(dummy));
+        when(authIntegrationService.getJastiperProfile(any())).thenReturn(new HashMap<>()).thenThrow(new RuntimeException("Simulated Failure"));
+        Optional<ProductResponse> res = productService.getProductById(prodId);
+        assertTrue(res.isPresent());
+    }
+
+    @Test
+    void testEnrichProductResponse_JastiperAndCategoryIsNull_Branch() {
+        UUID prodId = UUID.randomUUID();
+        Product dummy = new Product();
+        dummy.setProductId(prodId);
+        dummy.setJastiperId(UUID.randomUUID());
+        dummy.setStatus(ProductStatus.ACTIVE);
+        dummy.setPrice(100);
+        dummy.setStock(10);
+        ProductResponse mockResponse = new ProductResponse();
+        mockResponse.setJastiper(null);
+        mockResponse.setCategory(null);
+
+        when(productRepository.findById(prodId)).thenReturn(Optional.of(dummy));
+        when(authIntegrationService.getJastiperProfile(any())).thenReturn(new HashMap<>());
+        try (MockedStatic<ProductResponse> mockedStatic = mockStatic(ProductResponse.class)) {
+            mockedStatic.when(() -> ProductResponse.fromEntity(dummy)).thenReturn(mockResponse);
+            Optional<ProductResponse> res = productService.getProductById(prodId);
+            assertTrue(res.isPresent());
+            assertNotNull(res.get().getJastiper());
+        }
     }
 }
