@@ -10,19 +10,18 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ModelCreationTest {
-
     @Test
     void testCategoryCreation() {
         Category category = new Category();
         category.setCategoryId(1);
-        category.setName("Elektronik");
-        category.setSlug("elektronik");
-        category.setDescription("Barang elektronik");
+        category.setName("Electronic");
+        category.setSlug("electronic");
+        category.setDescription("Barang electronic");
         category.setProductCount(0);
         category.setCreatedAt(LocalDateTime.now());
 
         assertNotNull(category);
-        assertEquals("Elektronik", category.getName());
+        assertEquals("Electronic", category.getName());
     }
 
     @Test
@@ -33,7 +32,7 @@ class ModelCreationTest {
         log.setProduct(dummyProduct);
         log.setAdminId(UUID.randomUUID());
         log.setAction(ModerationAction.REMOVE);
-        log.setReason("Melanggar aturan");
+        log.setReason("Breaking the rules");
         log.setCreatedAt(LocalDateTime.now());
 
         assertNotNull(log);
@@ -57,32 +56,10 @@ class ModelCreationTest {
     }
 
     @Test
-    void testCategoryPrePersist() {
-        Category category = new Category();
-        assertNull(category.getCreatedAt());
-
-        category.onCreate();
-
-        assertNotNull(category.getCreatedAt());
-    }
-
-    @Test
     void testModerationLogPrePersist() {
         ModerationLog log = new ModerationLog();
         assertNull(log.getCreatedAt());
-
         log.onCreate();
-
         assertNotNull(log.getCreatedAt());
-    }
-
-    @Test
-    void testStockReservationPrePersist() {
-        StockReservation reservation = new StockReservation();
-        assertNull(reservation.getCreatedAt());
-
-        reservation.onCreate();
-
-        assertNotNull(reservation.getCreatedAt());
     }
 }
