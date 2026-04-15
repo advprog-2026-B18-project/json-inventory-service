@@ -1,41 +1,29 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.model;
 
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ReservationStatus;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.Positive;
+import lombok.*;
+import org.hibernate.annotations.Check;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-import jakarta.validation.constraints.Positive;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-
 @Entity
-@Table(name = "stock_reservations")
+@Table(name = "stock_reservations", indexes = {@Index(name = "idx_reservation_order_product", columnList = "order_id, product_id")})
 @Getter
 @Setter
+@EntityListeners(AuditingEntityListener.class)
+@Check(constraints = "quantity > 0")
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class StockReservation {
-
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "reservation_id")
+    @Column(name = "reservation_id", updatable = false, nullable = false)
     private UUID reservationId;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -45,23 +33,19 @@ public class StockReservation {
     @Column(name = "order_id", nullable = false)
     private UUID orderId;
 
-    @Positive(message = "Quantity must be greater than zero")
-    @Column(name = "quantity", nullable = false)
+    @Positive(message = "Reservation quantity must be positive")
+    @Column(nullable = false)
     private Integer quantity;
 
-    @Builder.Default
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(nullable = false, length = 30)
+    @Builder.Default
     private ReservationStatus status = ReservationStatus.PENDING;
 
-    @Column(name = "created_at", updatable = false)
+    @CreatedDate
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Column(name = "expires_at")
     private LocalDateTime expiresAt;
-
-    @PrePersist
-    protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-    }
 }
