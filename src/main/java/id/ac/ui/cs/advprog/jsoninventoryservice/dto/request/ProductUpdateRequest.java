@@ -1,23 +1,32 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.dto.request;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Data
 public class ProductUpdateRequest {
+    @Size(max = 255)
     private String name;
+
+    @Size(max = 5000)
     private String description;
+
+    @PositiveOrZero
     private Long price;
+
+    @PositiveOrZero
     private Integer stock;
+
     private String status;
-    @JsonProperty("category_id")
     private Integer categoryId;
-    @JsonProperty("weight_gram")
-    private Integer weightGram;
-    @JsonProperty("service_fee")
+    private String originCountry;
+    private LocalDate purchaseDate;
     private Long serviceFee;
+    private Integer weightGram;
     private List<String> images;
     private List<String> tags;
 }
