@@ -11,17 +11,17 @@ class ProductResponseBuilderTest {
     void testProductResponseBuilder() {
         UUID id = UUID.randomUUID();
         ProductResponse res = ProductResponse.builder()
-                .id(id)
-                .name("Kamera")
-                .price(5000000L)
+                .productId(id)
+                .name("Camera")
+                .price(5000000)
                 .stock(2)
                 .status("ACTIVE")
                 .build();
 
         assertNotNull(res);
-        assertEquals(id, res.getId());
-        assertEquals("Kamera", res.getName());
-        assertEquals(5000000L, res.getPrice());
+        assertEquals(id, res.getProductId());
+        assertEquals("Camera", res.getName());
+        assertEquals(5000000, res.getPrice());
         assertEquals("ACTIVE", res.getStatus());
     }
 }
