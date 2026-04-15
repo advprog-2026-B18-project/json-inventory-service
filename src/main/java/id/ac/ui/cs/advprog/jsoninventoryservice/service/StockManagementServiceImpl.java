@@ -3,6 +3,7 @@ package id.ac.ui.cs.advprog.jsoninventoryservice.service;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.StockReleaseRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.StockReserveRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.ProductResponse;
+import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.StockOperationResponse;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.Product;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.StockReservation;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
@@ -23,17 +24,22 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class StockManagementServiceImpl implements StockManagementService {
-
     private final ProductRepository productRepository;
     private final StockReservationRepository reservationRepository;
 
     @Override
     @Transactional
-    public Optional<ProductResponse> reserveStock(UUID productId, StockReserveRequest req) {
-        Optional<StockReservation> existing = reservationRepository.findByOrderIdAndProduct_Id(req.getOrderId(), productId);
+    public Optional<StockOperationResponse> reserveStock(UUID productId, StockReserveRequest req) {
+        Optional<StockReservation> existing = reservationRepository.findByOrderIdAndProduct_ProductId(req.getOrderId(), productId);
 
         if (existing.isPresent() && existing.get().getStatus() != ReservationStatus.RELEASED) {
-            return productRepository.findByIdForUpdate(productId).map(ProductResponse::fromEntity);
+            return productRepository.findByIdForUpdate(productId).map(p -> StockOperationResponse.builder()
+                    .productId(p.getProductId())
+                    .reservedQuantity(existing.get().getQuantity())
+                    .remainingStock(p.getStock())
+                    .reservationId(existing.get().getReservationId())
+                    .status("RESERVED")
+                    .build());
         }
 
         return productRepository.findByIdForUpdate(productId).map(p -> {
@@ -52,16 +58,22 @@ public class StockManagementServiceImpl implements StockManagementService {
                     .status(ReservationStatus.PENDING)
                     .expiresAt(LocalDateTime.now().plusMinutes(15))
                     .build();
-            reservationRepository.save(res);
+            res = reservationRepository.save(res);
 
-            return ProductResponse.fromEntity(p);
+            return StockOperationResponse.builder()
+                    .productId(p.getProductId())
+                    .reservedQuantity(res.getQuantity())
+                    .remainingStock(p.getStock())
+                    .reservationId(res.getReservationId())
+                    .status("RESERVED")
+                    .build();
         });
     }
 
     @Override
     @Transactional
     public Optional<ProductResponse> releaseStock(UUID id, StockReleaseRequest req) {
-        Optional<StockReservation> optRes = reservationRepository.findByOrderIdAndProduct_Id(req.getOrderId(), id);
+        Optional<StockReservation> optRes = reservationRepository.findByOrderIdAndProduct_ProductId(req.getOrderId(), id);
 
         if (optRes.isPresent() && optRes.get().getStatus() != ReservationStatus.RELEASED) {
             StockReservation res = optRes.get();
@@ -96,7 +108,7 @@ public class StockManagementServiceImpl implements StockManagementService {
             return Optional.empty();
         }
         Product product = optProduct.get();
-        Optional<StockReservation> optRes = reservationRepository.findByOrderIdAndProduct_Id(request.getOrderId(), id);
+        Optional<StockReservation> optRes = reservationRepository.findByOrderIdAndProduct_ProductId(request.getOrderId(), id);
 
         if ("CONFIRM".equalsIgnoreCase(request.getAction())) {
 
@@ -111,8 +123,9 @@ public class StockManagementServiceImpl implements StockManagementService {
 
             if (request.getRating() != null && request.getRating() >= 1.0 && request.getRating() <= 5.0) {
                 int currentReviews = product.getTotalReviews() != null ? product.getTotalReviews() : 0;
-                double currentAvg = product.getAvgRating() != null ? product.getAvgRating() : 0.0;
-                Double newAvg = ((currentAvg * currentReviews) + request.getRating()) / (currentReviews + 1);
+                float currentAvg = product.getAvgRating() != null ? product.getAvgRating() : 0.0f;
+                float newAvg = ((currentAvg * currentReviews) + request.getRating().floatValue()) / (currentReviews + 1);
+
                 product.setTotalReviews(currentReviews + 1);
                 product.setAvgRating(newAvg);
             }
