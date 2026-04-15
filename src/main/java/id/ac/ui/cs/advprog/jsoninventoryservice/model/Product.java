@@ -1,6 +1,14 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.model;
 
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
+import lombok.*;
+import org.hibernate.annotations.Check;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -8,72 +16,59 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import jakarta.persistence.*;
-import jakarta.validation.constraints.PositiveOrZero;
-
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-
 @Entity
-@Table(name = "products", indexes = {
-        @Index(name = "idx_products_jastiper", columnList = "jastiper_id"),
-        @Index(name = "idx_products_status", columnList = "status")
-})
+@Table(name = "products")
 @Getter
 @Setter
+@EntityListeners(AuditingEntityListener.class)
+@Check(constraints = "stock >= 0")
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class Product {
-
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "id", nullable = false)
-    private UUID id;
+    @Column(name = "product_id", updatable = false, nullable = false)
+    private UUID productId;
 
     @Column(name = "jastiper_id", nullable = false)
     private UUID jastiperId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id")
-    private Category category;
+    @Column(name = "category_id")
+    private Integer categoryId;
 
-    @Column(name = "name", nullable = false, length = 255)
+    @Column(nullable = false)
     private String name;
 
-    @Column(name = "description", nullable = false, columnDefinition = "TEXT")
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String description;
 
-    @PositiveOrZero
-    @Column(name = "price", nullable = false)
-    private Long price;
+    @Positive(message = "Price must be more than 0")
+    @Column(nullable = false)
+    private Integer price;
 
+    @PositiveOrZero
+    @Column(name = "service_fee", nullable = false, columnDefinition = "integer default 0")
     @Builder.Default
-    @PositiveOrZero
-    @Column(name = "service_fee", nullable = false)
-    private Long serviceFee = 0L;
+    private Integer serviceFee = 0;
 
-    @PositiveOrZero
-    @Column(name = "stock", nullable = false)
+    @Column(nullable = false)
     private Integer stock;
 
-    @Column(name = "origin_country", nullable = false, length = 255)
+    @Column(name = "origin_country", nullable = false)
     private String originCountry;
 
     @Column(name = "purchase_date", nullable = false)
     private LocalDate purchaseDate;
 
-    @Column(name = "weight_gram")
-    private Integer weightGram;
-
     @ElementCollection
     @CollectionTable(name = "product_images", joinColumns = @JoinColumn(name = "product_id"))
-    @Column(name = "image")
+    @Column(name = "image_url")
     @Builder.Default
     private List<String> images = new ArrayList<>();
+
+    @Column(name = "weight_gram")
+    private Integer weightGram;
 
     @ElementCollection
     @CollectionTable(name = "product_tags", joinColumns = @JoinColumn(name = "product_id"))
@@ -82,39 +77,29 @@ public class Product {
     private List<String> tags = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(nullable = false, length = 30)
     @Builder.Default
     private ProductStatus status = ProductStatus.ACTIVE;
 
     @Column(name = "avg_rating")
-    @Builder.Default
-    private Double avgRating = 0.0;
+    private Float avgRating;
 
-    @Column(name = "total_reviews", nullable = false)
+    @Column(name = "total_reviews", nullable = false, columnDefinition = "integer default 0")
     @Builder.Default
     private Integer totalReviews = 0;
 
-    @Column(name = "total_orders", nullable = false)
+    @Column(name = "total_orders", nullable = false, columnDefinition = "integer default 0")
     @Builder.Default
     private Integer totalOrders = 0;
-
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    @PrePersist
-    protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
-    }
+    @CreatedDate
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
 
-    @PreUpdate
-    protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
+    @LastModifiedDate
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
 }
