@@ -3,6 +3,8 @@ package id.ac.ui.cs.advprog.jsoninventoryservice.service;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductCreateRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductUpdateRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.ProductResponse;
+import id.ac.ui.cs.advprog.jsoninventoryservice.exception.ActiveOrderException;
+import id.ac.ui.cs.advprog.jsoninventoryservice.exception.UnauthorizedAccessException;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.Category;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.Product;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
@@ -12,35 +14,70 @@ import id.ac.ui.cs.advprog.jsoninventoryservice.repository.ProductRepository;
 import id.ac.ui.cs.advprog.jsoninventoryservice.repository.StockReservationRepository;
 import id.ac.ui.cs.advprog.jsoninventoryservice.specification.ProductSpecification;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @Transactional
 @RequiredArgsConstructor
 public class ProductServiceImpl implements ProductService {
-
-    @Autowired
-    private ProductRepository productRepository;
-
-    @Autowired
-    private CategoryRepository categoryRepository;
-
-    @Autowired
-    private StockReservationRepository stockReservationRepository;
+    private final ProductRepository productRepository;
+    private final CategoryRepository categoryRepository;
+    private final StockReservationRepository stockReservationRepository;
+    private final AuthIntegrationService authIntegrationService;
 
     @Override
     public Optional<ProductResponse> getProductById(UUID id) {
-        return productRepository.findById(id).map(ProductResponse::fromEntity);
+        return productRepository.findById(id)
+                .filter(product -> product.getDeletedAt() == null && (product.getStatus() == ProductStatus.ACTIVE || product.getStatus() == ProductStatus.OUT_OF_STOCK))
+                .filter(product -> {
+                    Map<String, Object> profile = authIntegrationService.getJastiperProfile(product.getJastiperId());
+                    if (profile != null && profile.containsKey("status")) {
+                        return !"BANNED".equalsIgnoreCase((String) profile.get("status"));
+                    }
+                    return true;
+                })
+                .map(this::enrichProductResponse);
+    }
+
+    private ProductResponse enrichProductResponse(Product p) {
+        ProductResponse res = ProductResponse.fromEntity(p);
+
+        if (p.getCategoryId() != null) {
+            categoryRepository.findById(p.getCategoryId()).ifPresent(cat -> {
+                if (res.getCategory() == null) {
+                    res.setCategory(ProductResponse.CategoryInfo.builder().id(p.getCategoryId()).build());
+                }
+                res.getCategory().setName(cat.getName());
+            });
+        }
+
+        if (res.getJastiper() == null) {
+            res.setJastiper(ProductResponse.JastiperInfo.builder().userId(p.getJastiperId()).build());
+        }
+
+        try {
+            Map<String, Object> jastiperProfile = authIntegrationService.getJastiperProfile(p.getJastiperId());
+            if (jastiperProfile != null) {
+                res.getJastiper().setUsername((String) jastiperProfile.get("username"));
+                res.getJastiper().setFullName((String) jastiperProfile.get("full_name"));
+                res.getJastiper().setProfilePictureUrl((String) jastiperProfile.get("profile_picture_url"));
+
+                if (jastiperProfile.containsKey("avg_rating")) {
+                    res.getJastiper().setAvgRating(Double.valueOf(jastiperProfile.get("avg_rating").toString()));
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        return res;
     }
 
     @Override
@@ -48,7 +85,6 @@ public class ProductServiceImpl implements ProductService {
         Category category = null;
         if (req.getCategoryId() != null) {
             category = categoryRepository.findById(req.getCategoryId()).orElse(null);
-
             if (category != null) {
                 category.setProductCount(category.getProductCount() + 1);
                 categoryRepository.save(category);
@@ -57,11 +93,11 @@ public class ProductServiceImpl implements ProductService {
 
         Product product = Product.builder()
                 .jastiperId(jastiperId)
-                .category(category)
+                .categoryId(category != null ? category.getCategoryId() : null)
                 .name(req.getName())
                 .description(req.getDescription())
-                .price(req.getPrice())
-                .serviceFee(req.getServiceFee() != null ? req.getServiceFee() : 0L)
+                .price(req.getPrice() != null ? req.getPrice().intValue() : 0)
+                .serviceFee(req.getServiceFee() != null ? req.getServiceFee().intValue() : 0)
                 .stock(req.getStock())
                 .originCountry(req.getOriginCountry())
                 .purchaseDate(req.getPurchaseDate())
@@ -77,11 +113,13 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public Optional<ProductResponse> updateProduct(UUID jastiperId, UUID id, ProductUpdateRequest req) {
         return productRepository.findByIdForUpdate(id).map(existing -> {
-            if (!existing.getJastiperId().equals(jastiperId)) return null;
+            if (!existing.getJastiperId().equals(jastiperId)) {
+                throw new UnauthorizedAccessException("You are not authorized to modify this product.");
+            }
 
             if (req.getName() != null) existing.setName(req.getName());
             if (req.getDescription() != null) existing.setDescription(req.getDescription());
-            if (req.getPrice() != null) existing.setPrice(req.getPrice());
+            if (req.getPrice() != null) existing.setPrice(req.getPrice().intValue());
             if (req.getStock() != null) {
                 existing.setStock(req.getStock());
                 if (existing.getStock() <= 0) {
@@ -96,18 +134,27 @@ public class ProductServiceImpl implements ProductService {
             }
 
             if (req.getCategoryId() != null) {
-                Category oldCategory = existing.getCategory();
+                Integer oldCategoryId = existing.getCategoryId();
                 Category newCategory = categoryRepository.findById(req.getCategoryId()).orElse(null);
-                if (newCategory != null && (oldCategory == null || !oldCategory.getCategoryId().equals(newCategory.getCategoryId()))) {
-                    if (oldCategory != null) {
-                        oldCategory.setProductCount(Math.max(0, oldCategory.getProductCount() - 1));
-                        categoryRepository.save(oldCategory);
+
+                if (newCategory != null && !newCategory.getCategoryId().equals(oldCategoryId)) {
+                    if (oldCategoryId != null) {
+                        categoryRepository.findById(oldCategoryId).ifPresent(oldCat -> {
+                            oldCat.setProductCount(Math.max(0, oldCat.getProductCount() - 1));
+                            categoryRepository.save(oldCat);
+                        });
                     }
                     newCategory.setProductCount(newCategory.getProductCount() + 1);
                     categoryRepository.save(newCategory);
-                    existing.setCategory(newCategory);
+                    existing.setCategoryId(newCategory.getCategoryId());
                 }
             }
+            if (req.getOriginCountry() != null) existing.setOriginCountry(req.getOriginCountry());
+            if (req.getPurchaseDate() != null) existing.setPurchaseDate(req.getPurchaseDate());
+            if (req.getServiceFee() != null) existing.setServiceFee(req.getServiceFee().intValue());
+            if (req.getWeightGram() != null) existing.setWeightGram(req.getWeightGram());
+            if (req.getImages() != null) existing.setImages(req.getImages());
+            if (req.getTags() != null) existing.setTags(req.getTags());
 
             return ProductResponse.fromEntity(productRepository.save(existing));
         });
@@ -115,33 +162,35 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public boolean deleteProduct(UUID jastiperId, UUID id) {
-        return productRepository.findByIdForUpdate(id).map(existing -> {
-            if (!existing.getJastiperId().equals(jastiperId)) return false;
+        Product existing = productRepository.findByIdForUpdate(id).orElseThrow(() -> new IllegalArgumentException("Product not found"));
 
-            long activeOrders = stockReservationRepository.countByProduct_IdAndStatus(id, ReservationStatus.PENDING);
-            if (activeOrders > 0) {
-                throw new IllegalStateException("Products that have active orders (PENDING status) cannot be deleted.");
-            }
+        if (!existing.getJastiperId().equals(jastiperId)) {
+            throw new UnauthorizedAccessException("You are not authorized to delete this product.");
+        }
 
-            existing.setDeletedAt(LocalDateTime.now());
+        long activeOrders = stockReservationRepository.countByProductProductIdAndStatusIn(id, List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED));
 
-            if (existing.getCategory() != null) {
-                Category cat = existing.getCategory();
+        if (activeOrders > 0) {
+            throw new ActiveOrderException(activeOrders);
+        }
+
+        existing.setDeletedAt(LocalDateTime.now());
+        existing.setStatus(ProductStatus.HIDDEN);
+
+        if (existing.getCategoryId() != null) {
+            categoryRepository.findById(existing.getCategoryId()).ifPresent(cat -> {
                 cat.setProductCount(Math.max(0, cat.getProductCount() - 1));
                 categoryRepository.save(cat);
-            }
-
-            productRepository.save(existing);
-            return true;
-        }).orElse(false);
+            });
+        }
+        productRepository.save(existing);
+        return true;
     }
 
     @Override
-    public Page<ProductResponse> searchProductsPublic(String keyword, UUID jastiperId, Long minPrice, Long maxPrice, Integer categoryId, Pageable pageable) {
-        Specification<Product> spec = ProductSpecification.searchProducts(keyword, jastiperId, minPrice, maxPrice, categoryId, ProductStatus.ACTIVE);
-
-        Page<Product> products = productRepository.findAll(spec, pageable);
-        return products.map(ProductResponse::fromEntity);
+    public Page<ProductResponse> searchProductsPublic(String keyword, UUID jastiperId, Long minPrice, Long maxPrice, Integer categoryId, String originCountry, LocalDate dateFrom, LocalDate dateTo, Pageable pageable) {
+        Specification<Product> spec = ProductSpecification.searchProducts(keyword, jastiperId, minPrice, maxPrice, categoryId, ProductStatus.ACTIVE, originCountry, dateFrom, dateTo);
+        return productRepository.findAll(spec, pageable).map(this::mapToThumbnailResponse);
     }
 
     @Override
@@ -151,7 +200,15 @@ public class ProductServiceImpl implements ProductService {
             filterStatus = ProductStatus.valueOf(status.toUpperCase());
         }
 
-        Specification<Product> spec = ProductSpecification.searchProducts(q, jastiperId, null, null, null, filterStatus);
-        return productRepository.findAll(spec, pageable).map(ProductResponse::fromEntity);
+        Specification<Product> spec = ProductSpecification.searchProducts(q, jastiperId, null, null, null, filterStatus, null, null, null);
+        return productRepository.findAll(spec, pageable).map(this::mapToThumbnailResponse);
+    }
+
+    private ProductResponse mapToThumbnailResponse(Product p) {
+        ProductResponse res = ProductResponse.fromEntity(p);
+        if (res.getImages() != null && !res.getImages().isEmpty()) {
+            res.setImages(List.of(res.getImages().getFirst()));
+        }
+        return res;
     }
 }
