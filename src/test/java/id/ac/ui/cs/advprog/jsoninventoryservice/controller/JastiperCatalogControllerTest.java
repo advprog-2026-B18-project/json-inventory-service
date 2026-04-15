@@ -28,7 +28,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(JastiperCatalogController.class)
 @AutoConfigureMockMvc(addFilters = false)
 class JastiperCatalogControllerTest {
-
     @Autowired
     private MockMvc mockMvc;
 
@@ -49,14 +48,14 @@ class JastiperCatalogControllerTest {
         ProductResponse res = ProductResponse.builder().name("Tumbler").build();
         Page<ProductResponse> page = new PageImpl<>(List.of(res));
 
-        when(searchService.searchProductsPublic(any(), eq(jastiperId), any(), any(), any(), any(Pageable.class)))
-                .thenReturn(page);
+        when(searchService.searchProductsPublic(any(), eq(jastiperId), any(), any(), any(), any(), any(), any(), any(Pageable.class))).thenReturn(page);
 
         mockMvc.perform(get("/jastipers/jastiper123/products")
                         .param("q", "Tumbler")
                         .param("min_price", "100")
                         .param("max_price", "1000")
                         .param("category_id", "1")
+                        .param("origin_country", "Japan")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Fetched jastiper catalog successfully."))
