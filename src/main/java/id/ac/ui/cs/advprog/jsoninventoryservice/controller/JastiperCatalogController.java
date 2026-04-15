@@ -19,7 +19,6 @@ import java.util.UUID;
 @RequestMapping("/jastipers")
 @RequiredArgsConstructor
 public class JastiperCatalogController {
-
     private final ProductService searchService;
     private final AuthIntegrationService authIntegrationService;
 
@@ -30,11 +29,12 @@ public class JastiperCatalogController {
             @RequestParam(required = false, name = "min_price") Long minPrice,
             @RequestParam(required = false, name = "max_price") Long maxPrice,
             @RequestParam(required = false, name = "category_id") Integer categoryId,
+            @RequestParam(required = false, name = "origin_country") String originCountry,
             Pageable pageable) {
 
         UUID jastiperId = authIntegrationService.getJastiperIdByUsername(username);
 
-        Page<ProductResponse> productPage = searchService.searchProductsPublic(q, jastiperId, minPrice, maxPrice, categoryId, pageable);
+        Page<ProductResponse> productPage = searchService.searchProductsPublic(q, jastiperId, minPrice, maxPrice, categoryId, originCountry, null, null, pageable);
 
         Map<String, Object> responseData = new HashMap<>();
         responseData.put("data", productPage.getContent());
@@ -44,7 +44,6 @@ public class JastiperCatalogController {
         pagination.put("limit", productPage.getSize());
         pagination.put("total", productPage.getTotalElements());
         pagination.put("total_pages", productPage.getTotalPages());
-
         responseData.put("pagination", pagination);
 
         return ResponseUtil.success(responseData, "Fetched jastiper catalog successfully.");
