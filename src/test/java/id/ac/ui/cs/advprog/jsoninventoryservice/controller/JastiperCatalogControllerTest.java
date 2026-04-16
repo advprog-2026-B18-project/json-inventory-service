@@ -1,5 +1,6 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.controller;
 
+import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductSearchCriteria;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.ProductResponse;
 import id.ac.ui.cs.advprog.jsoninventoryservice.security.JwtUtil;
 import id.ac.ui.cs.advprog.jsoninventoryservice.service.AuthIntegrationService;
@@ -19,7 +20,6 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -48,8 +48,7 @@ class JastiperCatalogControllerTest {
         ProductResponse res = ProductResponse.builder().name("Tumbler").build();
         Page<ProductResponse> page = new PageImpl<>(List.of(res));
 
-        when(searchService.searchProductsPublic(any(), eq(jastiperId), any(), any(), any(), any(), any(), any(), any(Pageable.class))).thenReturn(page);
-
+        when(searchService.searchProductsPublic(any(ProductSearchCriteria.class), any(Pageable.class))).thenReturn(page);
         mockMvc.perform(get("/jastipers/jastiper123/products")
                         .param("q", "Tumbler")
                         .param("min_price", "100")
