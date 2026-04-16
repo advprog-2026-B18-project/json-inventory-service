@@ -1,6 +1,7 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.service;
 
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductCreateRequest;
+import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductSearchCriteria;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductUpdateRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.ProductResponse;
 import id.ac.ui.cs.advprog.jsoninventoryservice.exception.ActiveOrderException;
@@ -23,7 +24,6 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -132,8 +132,9 @@ class ProductServiceImplTest {
     @Test
     void testUpdateProduct_FailWrongOwner() {
         UUID wrongJastiperId = UUID.randomUUID();
+        ProductUpdateRequest request = new ProductUpdateRequest();
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
-        assertThrows(UnauthorizedAccessException.class, () -> productService.updateProduct(wrongJastiperId, productId, new ProductUpdateRequest()));
+        assertThrows(UnauthorizedAccessException.class, () -> productService.updateProduct(wrongJastiperId, productId, request));
     }
 
     @Test
@@ -191,13 +192,6 @@ class ProductServiceImplTest {
     }
 
     @Test
-    void testUpdateProduct_OwnerMismatchReturnsEmpty() {
-        UUID wrongJastiperId = UUID.randomUUID();
-        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
-        assertThrows(UnauthorizedAccessException.class, () -> productService.updateProduct(wrongJastiperId, productId, new ProductUpdateRequest()));
-    }
-
-    @Test
     void testUpdateProduct_PartialFields() {
         ProductUpdateRequest req = new ProductUpdateRequest();
         req.setDescription("New Description");
@@ -221,63 +215,6 @@ class ProductServiceImplTest {
         Optional<ProductResponse> response = productService.getProductById(productId);
         assertTrue(response.isPresent());
         assertNull(response.get().getImages());
-    }
-    @Test
-    void testGetMyCatalog() {
-        Pageable pageable = PageRequest.of(0, 10);
-        Page<Product> productPage = new PageImpl<>(List.of(dummyProduct));
-
-        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
-        var result = productService.getMyCatalog(jastiperId, "Test", "ACTIVE", pageable);
-        assertNotNull(result);
-        verify(((JpaSpecificationExecutor<Product>) productRepository), times(1)).findAll(any(Specification.class), eq(pageable));
-    }
-
-    @Test
-    void testSearchProductsPublic() {
-        Pageable pageable = PageRequest.of(0, 10);
-        Page<Product> productPage = new PageImpl<>(List.of(dummyProduct));
-
-        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
-        var result = productService.searchProductsPublic("keyword", UUID.randomUUID(), 1000L, 50000L, null, null, null, null, pageable);
-        assertNotNull(result);
-        verify(((JpaSpecificationExecutor<Product>) productRepository), times(1)).findAll(any(Specification.class), eq(pageable));
-    }
-
-    @Test
-    void testGetMyCatalog_WithNullFilters() {
-        Pageable pageable = PageRequest.of(0, 10);
-        Page<Product> productPage = new PageImpl<>(List.of(dummyProduct));
-        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
-        var result = productService.getMyCatalog(jastiperId, null, null, pageable);
-        assertNotNull(result);
-    }
-
-    @Test
-    void testGetMyCatalog_WithOnlySearchQuery() {
-        Pageable pageable = PageRequest.of(0, 10);
-        Page<Product> productPage = new PageImpl<>(List.of(dummyProduct));
-        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
-        var result = productService.getMyCatalog(jastiperId, "shoes", null, pageable);
-        assertNotNull(result);
-    }
-
-    @Test
-    void testGetMyCatalog_WithOnlyStatus() {
-        Pageable pageable = PageRequest.of(0, 10);
-        Page<Product> productPage = new PageImpl<>(List.of(dummyProduct));
-        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
-        var result = productService.getMyCatalog(jastiperId, null, "ACTIVE", pageable);
-        assertNotNull(result);
-    }
-
-    @Test
-    void testGetMyCatalog_WithEmptyStrings() {
-        Pageable pageable = PageRequest.of(0, 10);
-        Page<Product> productPage = new PageImpl<>(List.of(dummyProduct));
-        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
-        var result = productService.getMyCatalog(jastiperId, "", "", pageable);
-        assertNotNull(result);
     }
 
     @Test
@@ -452,7 +389,7 @@ class ProductServiceImplTest {
 
     @Test
     void testGetProductById_HiddenProduct_ReturnsEmpty() {
-        UUID productId = UUID.randomUUID();
+        productId = UUID.randomUUID();
         Product hiddenProduct = new Product();
         hiddenProduct.setProductId(productId);
         hiddenProduct.setStatus(ProductStatus.HIDDEN);
@@ -464,7 +401,7 @@ class ProductServiceImplTest {
 
     @Test
     void testGetProductById_SoftDeletedProduct_ReturnsEmpty() {
-        UUID productId = UUID.randomUUID();
+        productId = UUID.randomUUID();
         Product deletedProduct = new Product();
         deletedProduct.setProductId(productId);
         deletedProduct.setStatus(ProductStatus.ACTIVE);
@@ -477,7 +414,7 @@ class ProductServiceImplTest {
 
     @Test
     void testGetProductById_OutOfStockProduct_ReturnsProduct() {
-        UUID productId = UUID.randomUUID();
+        productId = UUID.randomUUID();
         Product outProduct = new Product();
         outProduct.setProductId(productId);
         outProduct.setStatus(ProductStatus.OUT_OF_STOCK);
@@ -557,22 +494,6 @@ class ProductServiceImplTest {
     }
 
     @Test
-    void testGetMyCatalog_WithEmptyImages() {
-        Pageable pageable = PageRequest.of(0, 10);
-        Product emptyImageProduct = new Product();
-        emptyImageProduct.setProductId(UUID.randomUUID());
-        emptyImageProduct.setImages(new ArrayList<>());
-        emptyImageProduct.setPrice(100000);
-        emptyImageProduct.setStock(5);
-        Page<Product> productPage = new PageImpl<>(List.of(emptyImageProduct));
-
-        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
-        var result = productService.getMyCatalog(jastiperId, null, null, pageable);
-        assertNotNull(result);
-        assertTrue(result.getContent().getFirst().getImages().isEmpty());
-    }
-
-    @Test
     void testUpdateProduct_WithPhase4Parameters() {
         ProductUpdateRequest req = new ProductUpdateRequest();
         req.setOriginCountry("US");
@@ -591,41 +512,8 @@ class ProductServiceImplTest {
     }
 
     @Test
-    void testGetMyCatalog_WithNullImages_Branch() {
-        Pageable pageable = PageRequest.of(0, 10);
-        Product nullImageProduct = new Product();
-        nullImageProduct.setProductId(UUID.randomUUID());
-        nullImageProduct.setPrice(50000);
-        nullImageProduct.setStock(10);
-        nullImageProduct.setImages(null);
-        Page<Product> productPage = new PageImpl<>(List.of(nullImageProduct));
-
-        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
-        var result = productService.getMyCatalog(jastiperId, null, null, pageable);
-        assertNotNull(result);
-        assertNull(result.getContent().getFirst().getImages());
-    }
-
-    @Test
-    void testGetMyCatalog_WithPopulatedImages_Branch() {
-        Pageable pageable = PageRequest.of(0, 10);
-        Product populatedImageProduct = new Product();
-        populatedImageProduct.setProductId(UUID.randomUUID());
-        populatedImageProduct.setPrice(50000);
-        populatedImageProduct.setStock(10);
-        populatedImageProduct.setImages(new ArrayList<>(List.of("img1.jpg", "img2.jpg")));
-        Page<Product> productPage = new PageImpl<>(List.of(populatedImageProduct));
-
-        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
-        var result = productService.getMyCatalog(jastiperId, null, null, pageable);
-        assertNotNull(result);
-        assertEquals(1, result.getContent().getFirst().getImages().size());
-        assertEquals("img1.jpg", result.getContent().getFirst().getImages().getFirst());
-    }
-
-    @Test
     void testGetProductById_Success_WithEnrichment() {
-        UUID productId = UUID.randomUUID();
+        productId = UUID.randomUUID();
         UUID jastiperId = UUID.randomUUID();
         Product product = new Product();
         product.setProductId(productId);
@@ -653,7 +541,7 @@ class ProductServiceImplTest {
 
     @Test
     void testGetProductById_JastiperBanned_ReturnsEmpty() {
-        UUID productId = UUID.randomUUID();
+        productId = UUID.randomUUID();
         Product product = new Product();
         product.setProductId(productId);
         product.setJastiperId(UUID.randomUUID());
@@ -834,5 +722,126 @@ class ProductServiceImplTest {
             assertTrue(res.isPresent());
             assertNotNull(res.get().getJastiper());
         }
+    }
+
+    @Test
+    void testGetMyCatalog() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Product> productPage = new PageImpl<>(List.of(dummyProduct));
+
+        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
+        ProductSearchCriteria criteria = ProductSearchCriteria.builder().jastiperId(jastiperId).keyword("Test").status(ProductStatus.ACTIVE).build();
+        var result = productService.getMyCatalog(criteria, pageable);
+        assertNotNull(result);
+    }
+
+    @Test
+    void testSearchProductsPublic() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Product> productPage = new PageImpl<>(List.of(dummyProduct));
+
+        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
+        ProductSearchCriteria criteria = ProductSearchCriteria.builder().keyword("keyword").jastiperId(UUID.randomUUID()).minPrice(1000L).maxPrice(50000L).build();
+        var result = productService.searchProductsPublic(criteria, pageable);
+        assertNotNull(result);
+    }
+
+    @Test
+    void testGetMyCatalog_WithNullFilters() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Product> productPage = new PageImpl<>(List.of(dummyProduct));
+        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
+
+        ProductSearchCriteria criteria = ProductSearchCriteria.builder().jastiperId(jastiperId).build();
+        var result = productService.getMyCatalog(criteria, pageable);
+        assertNotNull(result);
+    }
+
+    @Test
+    void testGetMyCatalog_WithOnlySearchQuery() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Product> productPage = new PageImpl<>(List.of(dummyProduct));
+        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
+
+        ProductSearchCriteria criteria = ProductSearchCriteria.builder().jastiperId(jastiperId).keyword("shoes").build();
+        var result = productService.getMyCatalog(criteria, pageable);
+        assertNotNull(result);
+    }
+
+    @Test
+    void testGetMyCatalog_WithOnlyStatus() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Product> productPage = new PageImpl<>(List.of(dummyProduct));
+        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
+
+        ProductSearchCriteria criteria = ProductSearchCriteria.builder().jastiperId(jastiperId).status(ProductStatus.ACTIVE).build();
+        var result = productService.getMyCatalog(criteria, pageable);
+        assertNotNull(result);
+    }
+
+    @Test
+    void testGetMyCatalog_WithEmptyStrings() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Product> productPage = new PageImpl<>(List.of(dummyProduct));
+        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
+
+        ProductSearchCriteria criteria = ProductSearchCriteria.builder().jastiperId(jastiperId).keyword("").build();
+        var result = productService.getMyCatalog(criteria, pageable);
+        assertNotNull(result);
+    }
+
+    @Test
+    void testGetMyCatalog_WithEmptyImages() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Product emptyImageProduct = new Product();
+        emptyImageProduct.setProductId(UUID.randomUUID());
+        emptyImageProduct.setImages(new ArrayList<>());
+        emptyImageProduct.setPrice(100000);
+        emptyImageProduct.setStock(5);
+        Page<Product> productPage = new PageImpl<>(List.of(emptyImageProduct));
+
+        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
+        ProductSearchCriteria criteria = ProductSearchCriteria.builder().jastiperId(jastiperId).build();
+
+        var result = productService.getMyCatalog(criteria, pageable);
+        assertNotNull(result);
+        assertTrue(result.getContent().getFirst().getImages().isEmpty());
+    }
+
+    @Test
+    void testGetMyCatalog_WithNullImages_Branch() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Product nullImageProduct = new Product();
+        nullImageProduct.setProductId(UUID.randomUUID());
+        nullImageProduct.setPrice(50000);
+        nullImageProduct.setStock(10);
+        nullImageProduct.setImages(null);
+        Page<Product> productPage = new PageImpl<>(List.of(nullImageProduct));
+
+        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
+        ProductSearchCriteria criteria = ProductSearchCriteria.builder().jastiperId(jastiperId).build();
+
+        var result = productService.getMyCatalog(criteria, pageable);
+        assertNotNull(result);
+        assertNull(result.getContent().getFirst().getImages());
+    }
+
+    @Test
+    void testGetMyCatalog_WithPopulatedImages_Branch() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Product populatedImageProduct = new Product();
+        populatedImageProduct.setProductId(UUID.randomUUID());
+        populatedImageProduct.setPrice(50000);
+        populatedImageProduct.setStock(10);
+        populatedImageProduct.setImages(new ArrayList<>(List.of("img1.jpg", "img2.jpg")));
+        Page<Product> productPage = new PageImpl<>(List.of(populatedImageProduct));
+
+        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(productPage);
+        ProductSearchCriteria criteria = ProductSearchCriteria.builder().jastiperId(jastiperId).build();
+
+        var result = productService.getMyCatalog(criteria, pageable);
+        assertNotNull(result);
+        assertEquals(1, result.getContent().getFirst().getImages().size());
+        assertEquals("img1.jpg", result.getContent().getFirst().getImages().getFirst());
     }
 }
