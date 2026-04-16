@@ -3,15 +3,11 @@ package id.ac.ui.cs.advprog.jsoninventoryservice.service;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.HttpClientErrorException;
@@ -23,14 +19,14 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.mockito.ArgumentMatchers.any;
+import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @ExtendWith(MockitoExtension.class)
-@MockitoSettings(strictness = Strictness.LENIENT)
-@SuppressWarnings({"unchecked", "rawtypes"})
 class AuthIntegrationServiceTest {
     @Mock
     private RestTemplate restTemplate;
@@ -38,218 +34,194 @@ class AuthIntegrationServiceTest {
     @InjectMocks
     private AuthIntegrationServiceImpl authService;
 
-    private String expectedId;
+    private final String username = "testuser";
+    private final UUID jastiperId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(authService, "authServiceUrl", "http://localhost:8080/api/auth");
+        ReflectionTestUtils.setField(authService, "authServiceUrl", "http://localhost:8082");
         ReflectionTestUtils.setField(authService, "restTemplate", restTemplate);
-        expectedId = UUID.randomUUID().toString();
     }
 
-    @Test
-    void getJastiperId_Success_WithId() {
-        Map rawResponse = new HashMap();
-        rawResponse.put("success", true);
-        Map dataMap = new HashMap();
-        dataMap.put("id", expectedId);
-        rawResponse.put("data", dataMap);
+    @ParameterizedTest
+    @ValueSource(strings = {"id", "userId", "user_id", "accountId"})
+    void testGetJastiperId_Success_VariousIdKeys(String idKey) {
+        Map<String, Object> mockData = new HashMap<>();
+        mockData.put(idKey, jastiperId.toString());
 
-        when(restTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(rawResponse);
-        UUID result = authService.getJastiperIdByUsername("user1");
-        assertEquals(UUID.fromString(expectedId), result);
-    }
+        Map<String, Object> mockResponse = new HashMap<>();
+        mockResponse.put("success", true);
+        mockResponse.put("data", mockData);
 
-    @Test
-    void getJastiperId_Success_WithUserId() {
-        Map rawResponse = new HashMap();
-        rawResponse.put("success", true);
-        Map dataMap = new HashMap();
-        dataMap.put("userId", expectedId);
-        rawResponse.put("data", dataMap);
-
-        when(restTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(rawResponse);
-        UUID result = authService.getJastiperIdByUsername("user1");
-        assertEquals(UUID.fromString(expectedId), result);
-    }
-
-    @Test
-    void getJastiperId_Success_WithUser_id() {
-        Map rawResponse = new HashMap();
-        rawResponse.put("success", true);
-        Map dataMap = new HashMap();
-        dataMap.put("user_id", expectedId);
-        rawResponse.put("data", dataMap);
-
-        when(restTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(rawResponse);
-        UUID result = authService.getJastiperIdByUsername("user1");
-        assertEquals(UUID.fromString(expectedId), result);
-    }
-
-    @Test
-    void getJastiperId_Success_WithAccountId() {
-        Map rawResponse = new HashMap();
-        rawResponse.put("success", true);
-        Map dataMap = new HashMap();
-        dataMap.put("accountId", expectedId);
-        rawResponse.put("data", dataMap);
-
-        when(restTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(rawResponse);
-        UUID result = authService.getJastiperIdByUsername("user1");
-        assertEquals(UUID.fromString(expectedId), result);
-    }
-
-    @Test
-    void getJastiperId_Fail_NotFound() {
-        HttpClientErrorException.NotFound notFoundException = Mockito.mock(HttpClientErrorException.NotFound.class);
-        when(restTemplate.getForObject(anyString(), eq(Map.class))).thenThrow(notFoundException);
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> authService.getJastiperIdByUsername("unknown"));
-        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+        when(restTemplate.getForObject(anyString(), eq(Map.class), any(Object[].class))).thenReturn(mockResponse);
+        UUID result = authService.getJastiperIdByUsername(username);
+        assertEquals(jastiperId, result);
     }
 
     @Test
     void testGetJastiperIdByUsername_ActiveAccount_Success() {
-        Map rawResponse = new HashMap();
-        rawResponse.put("success", true);
-        Map dataMap = new HashMap();
-        dataMap.put("id", expectedId);
-        dataMap.put("status", "ACTIVE");
-        dataMap.put("is_active", true);
-        rawResponse.put("data", dataMap);
+        Map<String, Object> mockData = new HashMap<>();
+        mockData.put("id", jastiperId.toString());
+        mockData.put("status", "ACTIVE");
+        mockData.put("is_active", true);
 
-        when(restTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(rawResponse);
-        UUID result = authService.getJastiperIdByUsername("active_user");
-        assertEquals(UUID.fromString(expectedId), result);
+        Map<String, Object> mockResponse = new HashMap<>();
+        mockResponse.put("success", true);
+        mockResponse.put("data", mockData);
+
+        when(restTemplate.getForObject(anyString(), eq(Map.class), any(Object[].class))).thenReturn(mockResponse);
+        UUID result = authService.getJastiperIdByUsername(username);
+        assertEquals(jastiperId, result);
     }
 
     @Test
     void testGetJastiperIdByUsername_MissingStatusAndIsActiveKeys_Success() {
-        Map rawResponse = new HashMap();
-        rawResponse.put("success", true);
-        Map dataMap = new HashMap();
-        dataMap.put("id", expectedId);
-        rawResponse.put("data", dataMap);
+        Map<String, Object> mockData = new HashMap<>();
+        mockData.put("id", jastiperId.toString());
 
-        when(restTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(rawResponse);
-        UUID result = authService.getJastiperIdByUsername("normal_user");
-        assertEquals(UUID.fromString(expectedId), result);
+        Map<String, Object> mockResponse = new HashMap<>();
+        mockResponse.put("success", true);
+        mockResponse.put("data", mockData);
+
+        when(restTemplate.getForObject(anyString(), eq(Map.class), any(Object[].class))).thenReturn(mockResponse);
+        UUID result = authService.getJastiperIdByUsername(username);
+        assertEquals(jastiperId, result);
     }
 
     @Test
     void testGetJastiperIdByUsername_BannedAccount_ThrowsForbidden() {
-        Map rawResponse = new HashMap();
-        rawResponse.put("success", true);
-        Map dataMap = new HashMap();
-        dataMap.put("id", expectedId);
-        dataMap.put("status", "BANNED");
-        rawResponse.put("data", dataMap);
+        Map<String, Object> mockData = new HashMap<>();
+        mockData.put("id", jastiperId.toString());
+        mockData.put("status", "BANNED");
 
-        when(restTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(rawResponse);
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> authService.getJastiperIdByUsername("banned_user"));
+        Map<String, Object> mockResponse = new HashMap<>();
+        mockResponse.put("success", true);
+        mockResponse.put("data", mockData);
+
+        when(restTemplate.getForObject(anyString(), eq(Map.class), any(Object[].class))).thenReturn(mockResponse);
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> authService.getJastiperIdByUsername(username));
         assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
     }
 
     @Test
     void testGetJastiperIdByUsername_InactiveAccount_ThrowsForbidden() {
-        Map rawResponse = new HashMap();
-        rawResponse.put("success", true);
-        Map dataMap = new HashMap();
-        dataMap.put("id", expectedId);
-        dataMap.put("is_active", false);
-        rawResponse.put("data", dataMap);
+        Map<String, Object> mockData = new HashMap<>();
+        mockData.put("id", jastiperId.toString());
+        mockData.put("is_active", false);
 
-        when(restTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(rawResponse);
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> authService.getJastiperIdByUsername("inactive_user"));
+        Map<String, Object> mockResponse = new HashMap<>();
+        mockResponse.put("success", true);
+        mockResponse.put("data", mockData);
+
+        when(restTemplate.getForObject(anyString(), eq(Map.class), any(Object[].class))).thenReturn(mockResponse);
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> authService.getJastiperIdByUsername(username));
         assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
     }
 
     @Test
-    void getJastiperId_Fail_ResponseNull() {
-        when(restTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(null);
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> authService.getJastiperIdByUsername("user1"));
-        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
-        assertTrue(exception.getReason().contains("Invalid response format"));
-    }
+    void getJastiperId_Fail_InvalidFormat() {
+        Map<String, Object> mockData = new HashMap<>();
+        mockData.put("wrong_key", jastiperId.toString());
 
-    @Test
-    void getJastiperId_Fail_SuccessFalse() {
-        Map rawResponse = new HashMap();
-        rawResponse.put("success", false);
+        Map<String, Object> mockResponse = new HashMap<>();
+        mockResponse.put("success", true);
+        mockResponse.put("data", mockData);
 
-        when(restTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(rawResponse);
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> authService.getJastiperIdByUsername("user1"));
-        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
-    }
-
-    @Test
-    void getJastiperId_Fail_MissingData() {
-        Map rawResponse = new HashMap();
-        rawResponse.put("success", true);
-        when(restTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(rawResponse);
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> authService.getJastiperIdByUsername("user1"));
-        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
-    }
-
-    @Test
-    void getJastiperId_Fail_MissingIdKey() {
-        Map rawResponse = new HashMap();
-        rawResponse.put("success", true);
-        Map dataMap = new HashMap();
-        dataMap.put("name", "Nahla");
-        rawResponse.put("data", dataMap);
-
-        when(restTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(rawResponse);
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> authService.getJastiperIdByUsername("user1"));
-        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+        when(restTemplate.getForObject(anyString(), eq(Map.class), any(Object[].class))).thenReturn(mockResponse);
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> authService.getJastiperIdByUsername(username));
+        assertEquals(NOT_FOUND, exception.getStatusCode());
     }
 
     @Test
     void getJastiperId_Fail_ConnectionError() {
-        when(restTemplate.getForObject(anyString(), eq(Map.class))).thenThrow(new RuntimeException("Connection Timeout"));
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> authService.getJastiperIdByUsername("user1"));
+        when(restTemplate.getForObject(anyString(), eq(Map.class), any(Object[].class))).thenThrow(new RuntimeException("Connection Refused"));
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> authService.getJastiperIdByUsername(username));
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, exception.getStatusCode());
     }
 
     @Test
-    void testGetJastiperProfile_FailOrNull() {
-        UUID userId = UUID.randomUUID();
-        when(restTemplate.exchange(
-                anyString(),
-                eq(HttpMethod.GET),
-                any(HttpEntity.class),
-                any(ParameterizedTypeReference.class)
-        )).thenThrow(new RuntimeException("Simulated Timeout or Error"));
-        Map<String, Object> result = authService.getJastiperProfile(userId);
-        assertNull(result);
+    void getJastiperId_Fail_NotFound() {
+        when(restTemplate.getForObject(anyString(), eq(Map.class), any(Object[].class))).thenThrow(mock(HttpClientErrorException.NotFound.class));
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> authService.getJastiperIdByUsername(username));
+        assertEquals(NOT_FOUND, exception.getStatusCode());
     }
 
     @Test
     void testGetJastiperProfile_Success() {
-        Map<String, Object> rawResponse = new HashMap<>();
-        rawResponse.put("success", true);
-        Map<String, Object> dataMap = new HashMap<>();
-        dataMap.put("username", "jastiper123");
-        rawResponse.put("data", dataMap);
+        Map<String, Object> mockData = new HashMap<>();
+        mockData.put("username", "testuser");
+        Map<String, Object> mockResponse = new HashMap<>();
+        mockResponse.put("success", true);
+        mockResponse.put("data", mockData);
 
-        when(restTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(rawResponse);
-        Map<String, Object> result = authService.getJastiperProfile(UUID.randomUUID());
+        when(restTemplate.getForObject(anyString(), eq(Map.class), any(Object[].class))).thenReturn(mockResponse);
+        Map<String, Object> result = authService.getJastiperProfile(jastiperId);
         assertNotNull(result);
-        assertEquals("jastiper123", result.get("username"));
+        assertEquals("testuser", result.get("username"));
+    }
+
+    @Test
+    void testGetJastiperProfile_FailOrNull() {
+        when(restTemplate.getForObject(anyString(), eq(Map.class), any(Object[].class))).thenReturn(null);
+        Map<String, Object> result = authService.getJastiperProfile(jastiperId);
+        assertTrue(result.isEmpty());
     }
 
     @Test
     void testGetJastiperProfile_ReturnsSuccessFalse() {
-        java.util.Map<String, Object> rawResponse = new java.util.HashMap<>();
-        rawResponse.put("success", false);
-        when(restTemplate.getForObject(anyString(), eq(java.util.Map.class))).thenReturn(rawResponse);
-        java.util.Map<String, Object> result = authService.getJastiperProfile(UUID.randomUUID());
-        assertNull(result);
+        Map<String, Object> mockResponse = new HashMap<>();
+        mockResponse.put("success", false);
+
+        when(restTemplate.getForObject(anyString(), eq(Map.class), any(Object[].class))).thenReturn(mockResponse);
+        Map<String, Object> result = authService.getJastiperProfile(jastiperId);
+        assertTrue(result.isEmpty());
     }
 
     @Test
     void testGetJastiperProfile_ThrowsException() {
-        when(restTemplate.getForObject(anyString(), eq(java.util.Map.class))).thenThrow(new RuntimeException("Connection Timeout"));
-        java.util.Map<String, Object> result = authService.getJastiperProfile(UUID.randomUUID());
-        assertNull(result);
+        when(restTemplate.getForObject(anyString(), eq(Map.class), any(Object[].class))).thenThrow(new RuntimeException("Timeout"));
+        Map<String, Object> result = authService.getJastiperProfile(jastiperId);
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void testGetJastiperIdByUsername_NullResponse() {
+        when(restTemplate.getForObject(anyString(), eq(Map.class), any(Object[].class))).thenReturn(null);
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> authService.getJastiperIdByUsername(username));
+        assertEquals(NOT_FOUND, exception.getStatusCode());
+    }
+
+    @Test
+    void testGetJastiperIdByUsername_SuccessIsFalse() {
+        Map<String, Object> mockResponse = new HashMap<>();
+        mockResponse.put("success", false);
+
+        when(restTemplate.getForObject(anyString(), eq(Map.class), any(Object[].class))).thenReturn(mockResponse);
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> authService.getJastiperIdByUsername(username));
+        assertEquals(NOT_FOUND, exception.getStatusCode());
+    }
+
+    @Test
+    void testGetJastiperIdByUsername_MissingDataKey() {
+        Map<String, Object> mockResponse = new HashMap<>();
+        mockResponse.put("success", true);
+
+        when(restTemplate.getForObject(anyString(), eq(Map.class), any(Object[].class))).thenReturn(mockResponse);
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> authService.getJastiperIdByUsername(username));
+        assertEquals(NOT_FOUND, exception.getStatusCode());
+    }
+
+    @Test
+    void testGetJastiperIdByUsername_ExtractIdReturnsNull() {
+        Map<String, Object> mockData = new HashMap<>();
+        mockData.put("unknown_key_format", jastiperId.toString());
+
+        Map<String, Object> mockResponse = new HashMap<>();
+        mockResponse.put("success", true);
+        mockResponse.put("data", mockData);
+
+        when(restTemplate.getForObject(anyString(), eq(Map.class), any(Object[].class))).thenReturn(mockResponse);
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> authService.getJastiperIdByUsername(username));
+        assertEquals(NOT_FOUND, exception.getStatusCode());
     }
 }
