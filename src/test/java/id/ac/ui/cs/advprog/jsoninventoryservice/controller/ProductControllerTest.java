@@ -20,8 +20,11 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -111,9 +114,7 @@ class ProductControllerTest {
     void testSearchProducts() throws Exception {
         PageImpl<ProductResponse> page = new PageImpl<>(Collections.singletonList(dummyResponse));
 
-        when(productService.searchProductsPublic(
-                any(), any(), any(), any(), any(), any(), any(), any(), any()
-        )).thenReturn(page);
+        when(productService.searchProductsPublic(any(), any())).thenReturn(page);
 
         mockMvc.perform(get("/products"))
                 .andExpect(status().isOk())
@@ -169,7 +170,7 @@ class ProductControllerTest {
     @Test
     void testGetMyCatalog() throws Exception {
         PageImpl<ProductResponse> page = new PageImpl<>(Collections.singletonList(dummyResponse));
-        when(productService.getMyCatalog(any(), any(), any(), any())).thenReturn(page);
+        when(productService.getMyCatalog(any(), any())).thenReturn(page);
 
         mockMvc.perform(get("/products/my")
                         .requestAttr("jastiperId", jastiperId))
@@ -265,42 +266,93 @@ class ProductControllerTest {
     }
 
     @Test
-    void testSearchProducts_Success() throws Exception {
-        PageImpl<ProductResponse> page = new PageImpl<>(Collections.singletonList(dummyResponse));
-
-        when(productService.searchProductsPublic(any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(page);
-
-        mockMvc.perform(get("/products")
-                        .param("page", "2")
-                        .param("limit", "10")
-                        .param("sort_by", "price")
-                        .param("order", "asc")
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
-    }
-
-    @Test
-    void testSearchProducts_SortByPurchaseDate_Ascending() throws Exception {
-        when(productService.searchProductsPublic(any(),any(),any(),any(),any(),any(),any(),any(),any()))
-                .thenReturn(new PageImpl<>(Collections.emptyList()));
-
-        mockMvc.perform(get("/products")
-                        .param("sort_by", "purchase_date")
-                        .param("order", "asc"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
-    }
-
-    @Test
     void testSearchProducts_SortByRating_Ascending() throws Exception {
-        when(productService.searchProductsPublic(any(),any(),any(),any(),any(),any(),any(),any(),any()))
-                .thenReturn(new PageImpl<>(Collections.emptyList()));
+        when(productService.searchProductsPublic(any(),any())).thenReturn(new PageImpl<>(Collections.emptyList()));
 
         mockMvc.perform(get("/products")
                         .param("sort_by", "rating")
                         .param("order", "asc"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
+    }
+    @Test
+    void testGetMyCatalog_WithEmptyStatus() throws Exception {
+        when(productService.getMyCatalog(any(), any())).thenReturn(new PageImpl<>(List.of()));
+        mockMvc.perform(get("/products/my")
+                        .requestAttr("jastiperId", jastiperId)
+                        .param("status", "   "))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void testGetMyCatalog_WithInvalidStatus_HitsCatchBlock() throws Exception {
+        when(productService.getMyCatalog(any(), any())).thenReturn(new PageImpl<>(List.of()));
+        mockMvc.perform(get("/products/my")
+                        .requestAttr("jastiperId", jastiperId)
+                        .param("status", "STATUS_YANG_SALAH"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void testGetMyCatalog_WithNullStatus() throws Exception {
+        when(productService.getMyCatalog(any(), any())).thenReturn(new PageImpl<>(List.of()));
+        mockMvc.perform(get("/products/my").requestAttr("jastiperId", jastiperId))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void testGetMyCatalog_WithValidStatus() throws Exception {
+        when(productService.getMyCatalog(any(), any()))
+                .thenReturn(new PageImpl<>(List.of()));
+        mockMvc.perform(get("/products/my")
+                        .requestAttr("jastiperId", jastiperId)
+                        .param("status", "active"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void testSearchProducts_DefaultSort_CreatedAt_Desc() throws Exception {
+        when(productService.searchProductsPublic(any(), any()))
+                .thenReturn(new PageImpl<>(Collections.emptyList()));
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/products"))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void testSearchProducts_SortByPurchaseDate_Asc() throws Exception {
+        when(productService.searchProductsPublic(any(), any()))
+                .thenReturn(new PageImpl<>(Collections.emptyList()));
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/products")
+                        .param("sort_by", "purchase_date")
+                        .param("sortBy", "purchase_date")
+                        .param("order", "asc"))
+                .andExpect(MockMvcResultMatchers.status().isOk());
+    }
+
+    @Test
+    void testSearchProducts_SortByRating_Desc() throws Exception {
+        when(productService.searchProductsPublic(any(), any()))
+                .thenReturn(new PageImpl<>(Collections.emptyList()));
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/products")
+                        .param("sort_by", "rating")
+                        .param("sortBy", "rating")
+                        .param("order", "desc"))
+                .andExpect(MockMvcResultMatchers.status().isOk());
+    }
+
+    @Test
+    void testSearchProducts_SortByOther_Asc() throws Exception {
+        when(productService.searchProductsPublic(any(), any()))
+                .thenReturn(new PageImpl<>(Collections.emptyList()));
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/products")
+                        .param("sort_by", "price")
+                        .param("sortBy", "price")
+                        .param("order", "asc"))
+                .andExpect(MockMvcResultMatchers.status().isOk());
     }
 }

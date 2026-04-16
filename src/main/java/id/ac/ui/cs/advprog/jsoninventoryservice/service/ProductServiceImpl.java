@@ -1,6 +1,7 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.service;
 
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductCreateRequest;
+import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductSearchCriteria;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductUpdateRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.ProductResponse;
 import id.ac.ui.cs.advprog.jsoninventoryservice.exception.ActiveOrderException;
@@ -20,7 +21,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -45,39 +45,6 @@ public class ProductServiceImpl implements ProductService {
                     return true;
                 })
                 .map(this::enrichProductResponse);
-    }
-
-    private ProductResponse enrichProductResponse(Product p) {
-        ProductResponse res = ProductResponse.fromEntity(p);
-
-        if (p.getCategoryId() != null) {
-            categoryRepository.findById(p.getCategoryId()).ifPresent(cat -> {
-                if (res.getCategory() == null) {
-                    res.setCategory(ProductResponse.CategoryInfo.builder().id(p.getCategoryId()).build());
-                }
-                res.getCategory().setName(cat.getName());
-            });
-        }
-
-        if (res.getJastiper() == null) {
-            res.setJastiper(ProductResponse.JastiperInfo.builder().userId(p.getJastiperId()).build());
-        }
-
-        try {
-            Map<String, Object> jastiperProfile = authIntegrationService.getJastiperProfile(p.getJastiperId());
-            if (jastiperProfile != null) {
-                res.getJastiper().setUsername((String) jastiperProfile.get("username"));
-                res.getJastiper().setFullName((String) jastiperProfile.get("full_name"));
-                res.getJastiper().setProfilePictureUrl((String) jastiperProfile.get("profile_picture_url"));
-
-                if (jastiperProfile.containsKey("avg_rating")) {
-                    res.getJastiper().setAvgRating(Double.valueOf(jastiperProfile.get("avg_rating").toString()));
-                }
-            }
-        } catch (Exception ignored) {
-        }
-
-        return res;
     }
 
     @Override
@@ -111,56 +78,6 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    public Optional<ProductResponse> updateProduct(UUID jastiperId, UUID id, ProductUpdateRequest req) {
-        return productRepository.findByIdForUpdate(id).map(existing -> {
-            if (!existing.getJastiperId().equals(jastiperId)) {
-                throw new UnauthorizedAccessException("You are not authorized to modify this product.");
-            }
-
-            if (req.getName() != null) existing.setName(req.getName());
-            if (req.getDescription() != null) existing.setDescription(req.getDescription());
-            if (req.getPrice() != null) existing.setPrice(req.getPrice().intValue());
-            if (req.getStock() != null) {
-                existing.setStock(req.getStock());
-                if (existing.getStock() <= 0) {
-                    existing.setStatus(ProductStatus.OUT_OF_STOCK);
-                } else if (existing.getStatus() == ProductStatus.OUT_OF_STOCK) {
-                    existing.setStatus(ProductStatus.ACTIVE);
-                }
-            }
-
-            if (req.getStatus() != null) {
-                existing.setStatus(ProductStatus.valueOf(req.getStatus().toUpperCase()));
-            }
-
-            if (req.getCategoryId() != null) {
-                Integer oldCategoryId = existing.getCategoryId();
-                Category newCategory = categoryRepository.findById(req.getCategoryId()).orElse(null);
-
-                if (newCategory != null && !newCategory.getCategoryId().equals(oldCategoryId)) {
-                    if (oldCategoryId != null) {
-                        categoryRepository.findById(oldCategoryId).ifPresent(oldCat -> {
-                            oldCat.setProductCount(Math.max(0, oldCat.getProductCount() - 1));
-                            categoryRepository.save(oldCat);
-                        });
-                    }
-                    newCategory.setProductCount(newCategory.getProductCount() + 1);
-                    categoryRepository.save(newCategory);
-                    existing.setCategoryId(newCategory.getCategoryId());
-                }
-            }
-            if (req.getOriginCountry() != null) existing.setOriginCountry(req.getOriginCountry());
-            if (req.getPurchaseDate() != null) existing.setPurchaseDate(req.getPurchaseDate());
-            if (req.getServiceFee() != null) existing.setServiceFee(req.getServiceFee().intValue());
-            if (req.getWeightGram() != null) existing.setWeightGram(req.getWeightGram());
-            if (req.getImages() != null) existing.setImages(req.getImages());
-            if (req.getTags() != null) existing.setTags(req.getTags());
-
-            return ProductResponse.fromEntity(productRepository.save(existing));
-        });
-    }
-
-    @Override
     public boolean deleteProduct(UUID jastiperId, UUID id) {
         Product existing = productRepository.findByIdForUpdate(id).orElseThrow(() -> new IllegalArgumentException("Product not found"));
 
@@ -187,28 +104,115 @@ public class ProductServiceImpl implements ProductService {
         return true;
     }
 
-    @Override
-    public Page<ProductResponse> searchProductsPublic(String keyword, UUID jastiperId, Long minPrice, Long maxPrice, Integer categoryId, String originCountry, LocalDate dateFrom, LocalDate dateTo, Pageable pageable) {
-        Specification<Product> spec = ProductSpecification.searchProducts(keyword, jastiperId, minPrice, maxPrice, categoryId, ProductStatus.ACTIVE, originCountry, dateFrom, dateTo);
-        return productRepository.findAll(spec, pageable).map(this::mapToThumbnailResponse);
-    }
-
-    @Override
-    public Page<ProductResponse> getMyCatalog(UUID jastiperId, String q, String status, Pageable pageable) {
-        ProductStatus filterStatus = null;
-        if (status != null && !status.trim().isEmpty()) {
-            filterStatus = ProductStatus.valueOf(status.toUpperCase());
-        }
-
-        Specification<Product> spec = ProductSpecification.searchProducts(q, jastiperId, null, null, null, filterStatus, null, null, null);
-        return productRepository.findAll(spec, pageable).map(this::mapToThumbnailResponse);
-    }
-
     private ProductResponse mapToThumbnailResponse(Product p) {
         ProductResponse res = ProductResponse.fromEntity(p);
         if (res.getImages() != null && !res.getImages().isEmpty()) {
             res.setImages(List.of(res.getImages().getFirst()));
         }
         return res;
+    }
+
+    private ProductResponse enrichProductResponse(Product p) {
+        ProductResponse res = ProductResponse.fromEntity(p);
+        if (p.getCategoryId() != null) {
+            categoryRepository.findById(p.getCategoryId()).ifPresent(cat -> {
+                if (res.getCategory() == null) {
+                    res.setCategory(ProductResponse.CategoryInfo.builder().id(p.getCategoryId()).build());
+                }
+                res.getCategory().setName(cat.getName());
+            });
+        }
+
+        if (res.getJastiper() == null) {
+            res.setJastiper(ProductResponse.JastiperInfo.builder().userId(p.getJastiperId()).build());
+        }
+
+        try {
+            Map<String, Object> jastiperProfile = authIntegrationService.getJastiperProfile(p.getJastiperId());
+            if (jastiperProfile != null && !jastiperProfile.isEmpty()) {
+                res.getJastiper().setUsername((String) jastiperProfile.get("username"));
+                res.getJastiper().setFullName((String) jastiperProfile.get("full_name"));
+                res.getJastiper().setProfilePictureUrl((String) jastiperProfile.get("profile_picture_url"));
+
+                if (jastiperProfile.containsKey("avg_rating")) {
+                    res.getJastiper().setAvgRating(Double.valueOf(jastiperProfile.get("avg_rating").toString()));
+                }
+            }
+        } catch (Exception ignored) {
+            // Ignored
+        }
+        return res;
+    }
+
+    @Override
+    public Optional<ProductResponse> updateProduct(UUID jastiperId, UUID id, ProductUpdateRequest req) {
+        return productRepository.findByIdForUpdate(id).map(existing -> {
+            if (!existing.getJastiperId().equals(jastiperId)) {
+                throw new UnauthorizedAccessException("You are not authorized to modify this product.");
+            }
+
+            updateBasicFields(existing, req);
+            updateStockAndStatus(existing, req);
+            updateCategory(existing, req);
+            return ProductResponse.fromEntity(productRepository.save(existing));
+        });
+    }
+
+    private void updateBasicFields(Product existing, ProductUpdateRequest req) {
+        if (req.getName() != null) existing.setName(req.getName());
+        if (req.getDescription() != null) existing.setDescription(req.getDescription());
+        if (req.getPrice() != null) existing.setPrice(req.getPrice().intValue());
+        if (req.getOriginCountry() != null) existing.setOriginCountry(req.getOriginCountry());
+        if (req.getPurchaseDate() != null) existing.setPurchaseDate(req.getPurchaseDate());
+        if (req.getServiceFee() != null) existing.setServiceFee(req.getServiceFee().intValue());
+        if (req.getWeightGram() != null) existing.setWeightGram(req.getWeightGram());
+        if (req.getImages() != null) existing.setImages(req.getImages());
+        if (req.getTags() != null) existing.setTags(req.getTags());
+    }
+
+    private void updateStockAndStatus(Product existing, ProductUpdateRequest req) {
+        if (req.getStock() != null) {
+            existing.setStock(req.getStock());
+            if (existing.getStock() <= 0) {
+                existing.setStatus(ProductStatus.OUT_OF_STOCK);
+            } else if (existing.getStatus() == ProductStatus.OUT_OF_STOCK) {
+                existing.setStatus(ProductStatus.ACTIVE);
+            }
+        }
+        if (req.getStatus() != null) {
+            existing.setStatus(ProductStatus.valueOf(req.getStatus().toUpperCase()));
+        }
+    }
+
+    private void updateCategory(Product existing, ProductUpdateRequest req) {
+        if (req.getCategoryId() != null) {
+            Integer oldCategoryId = existing.getCategoryId();
+            Category newCategory = categoryRepository.findById(req.getCategoryId()).orElse(null);
+
+            if (newCategory != null && !newCategory.getCategoryId().equals(oldCategoryId)) {
+                if (oldCategoryId != null) {
+                    categoryRepository.findById(oldCategoryId).ifPresent(oldCat -> {
+                        oldCat.setProductCount(Math.max(0, oldCat.getProductCount() - 1));
+                        categoryRepository.save(oldCat);
+                    });
+                }
+                newCategory.setProductCount(newCategory.getProductCount() + 1);
+                categoryRepository.save(newCategory);
+                existing.setCategoryId(newCategory.getCategoryId());
+            }
+        }
+    }
+
+    @Override
+    public Page<ProductResponse> searchProductsPublic(ProductSearchCriteria criteria, Pageable pageable) {
+        criteria.setStatus(ProductStatus.ACTIVE);
+        Specification<Product> spec = ProductSpecification.searchProducts(criteria);
+        return productRepository.findAll(spec, pageable).map(this::mapToThumbnailResponse);
+    }
+
+    @Override
+    public Page<ProductResponse> getMyCatalog(ProductSearchCriteria criteria, Pageable pageable) {
+        Specification<Product> spec = ProductSpecification.searchProducts(criteria);
+        return productRepository.findAll(spec, pageable).map(this::mapToThumbnailResponse);
     }
 }

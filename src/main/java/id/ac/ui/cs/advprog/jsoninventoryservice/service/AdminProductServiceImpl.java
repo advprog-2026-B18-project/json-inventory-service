@@ -1,6 +1,7 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.service;
 
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.AdminProductUpdateRequest;
+import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductSearchCriteria;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.ProductResponse;
 import id.ac.ui.cs.advprog.jsoninventoryservice.event.ProductModeratedEvent;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.ModerationLog;
@@ -33,12 +34,20 @@ public class AdminProductServiceImpl implements AdminProductService {
     public Page<ProductResponse> getAllProductsAdmin(String keyword, UUID jastiperId, String status, Integer categoryId, Pageable pageable) {
         ProductStatus filterStatus = null;
         if (status != null && !status.trim().isEmpty()) {
-            try { filterStatus = ProductStatus.valueOf(status.toUpperCase()); }
-            catch (IllegalArgumentException ignored) {}
+            try {
+                filterStatus = ProductStatus.valueOf(status.toUpperCase());
+            } catch (IllegalArgumentException ignored) {
+                // Ignored
+            }
         }
 
-        Specification<Product> spec = ProductSpecification.searchProducts(
-                keyword, jastiperId, null, null, categoryId, filterStatus, null, null, null);
+        ProductSearchCriteria criteria = ProductSearchCriteria.builder()
+                .keyword(keyword)
+                .jastiperId(jastiperId)
+                .categoryId(categoryId)
+                .status(filterStatus)
+                .build();
+        Specification<Product> spec = ProductSpecification.searchProducts(criteria);
 
         return productRepository.findAll(spec, pageable).map(ProductResponse::fromEntity);
     }
@@ -59,14 +68,16 @@ public class AdminProductServiceImpl implements AdminProductService {
                 throw new IllegalArgumentException("Invalid moderation action. Allowed: REMOVE, RESTORE, HIDE, ACTIVATE");
             }
 
-            if (action == ModerationAction.HIDE) {
-                product.setStatus(ProductStatus.HIDDEN);
-            } else if (action == ModerationAction.REMOVE) {
-                product.setStatus(ProductStatus.HIDDEN);
-                product.setDeletedAt(LocalDateTime.now());
-            } else {
-                product.setStatus(ProductStatus.ACTIVE);
-                product.setDeletedAt(null);
+            switch (action) {
+                case HIDE -> product.setStatus(ProductStatus.HIDDEN);
+                case REMOVE -> {
+                    product.setStatus(ProductStatus.HIDDEN);
+                    product.setDeletedAt(LocalDateTime.now());
+                }
+                default -> {
+                    product.setStatus(ProductStatus.ACTIVE);
+                    product.setDeletedAt(null);
+                }
             }
             productRepository.save(product);
 
