@@ -1,8 +1,10 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.controller;
 
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductCreateRequest;
+import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductSearchCriteria;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductUpdateRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.ProductResponse;
+import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
 import id.ac.ui.cs.advprog.jsoninventoryservice.service.ProductService;
 import id.ac.ui.cs.advprog.jsoninventoryservice.utils.ApiResponse;
 import id.ac.ui.cs.advprog.jsoninventoryservice.utils.ResponseUtil;
@@ -74,14 +76,40 @@ public class ProductController {
             @RequestParam(required = false, name = "purchase_date_to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
             @RequestParam(required = false, defaultValue = "1") int page,
             @RequestParam(required = false, defaultValue = "20") int limit,
-            @RequestParam(required = false, defaultValue = "created_at") String sort_by,
+            @RequestParam(required = false, defaultValue = "created_at") String sortBy,
             @RequestParam(required = false, defaultValue = "desc") String order) {
 
-        String sortProperty = sort_by.equals("created_at") ? "createdAt" : sort_by.equals("purchase_date") ? "purchaseDate" : sort_by.equals("rating") ? "avgRating" : sort_by;
-        Sort sort = order.equalsIgnoreCase("asc") ? Sort.by(sortProperty).ascending() : Sort.by(sortProperty).descending();
-        Pageable pageable = PageRequest.of(page - 1, limit, sort);
-        Page<ProductResponse> productPage = productService.searchProductsPublic(q, jastiperId, minPrice, maxPrice, categoryId, originCountry, dateFrom, dateTo, pageable);
+        String sortProperty;
+        if ("created_at".equals(sortBy)) {
+            sortProperty = "createdAt";
+        } else if ("purchase_date".equals(sortBy)) {
+            sortProperty = "purchaseDate";
+        } else if ("rating".equals(sortBy)) {
+            sortProperty = "avgRating";
+        } else {
+            sortProperty = sortBy;
+        }
 
+        Sort sort;
+        if ("asc".equalsIgnoreCase(order)) {
+            sort = Sort.by(sortProperty).ascending();
+        } else {
+            sort = Sort.by(sortProperty).descending();
+        }
+        Pageable pageable = PageRequest.of(page - 1, limit, sort);
+
+        ProductSearchCriteria criteria = ProductSearchCriteria.builder()
+                .keyword(q)
+                .jastiperId(jastiperId)
+                .minPrice(minPrice)
+                .maxPrice(maxPrice)
+                .categoryId(categoryId)
+                .originCountry(originCountry)
+                .dateFrom(dateFrom)
+                .dateTo(dateTo)
+                .build();
+
+        Page<ProductResponse> productPage = productService.searchProductsPublic(criteria, pageable);
         return ResponseUtil.success(buildPaginationMap(productPage), "Search results fetched.");
     }
 
@@ -93,7 +121,22 @@ public class ProductController {
             @RequestParam(required = false) String status,
             Pageable pageable) {
 
-        Page<ProductResponse> productPage = productService.getMyCatalog(jastiperId, q, status, pageable);
+        ProductStatus filterStatus = null;
+        if (status != null && !status.trim().isEmpty()) {
+            try {
+                filterStatus = ProductStatus.valueOf(status.toUpperCase());
+            } catch (IllegalArgumentException ignored) {
+                // Ignored
+            }
+        }
+
+        ProductSearchCriteria criteria = ProductSearchCriteria.builder()
+                .jastiperId(jastiperId)
+                .keyword(q)
+                .status(filterStatus)
+                .build();
+
+        Page<ProductResponse> productPage = productService.getMyCatalog(criteria, pageable);
         return ResponseUtil.success(buildPaginationMap(productPage), "My catalog fetched successfully.");
     }
 
