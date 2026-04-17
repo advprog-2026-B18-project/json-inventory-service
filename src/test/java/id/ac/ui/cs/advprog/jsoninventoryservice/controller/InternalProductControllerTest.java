@@ -6,9 +6,6 @@ import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.StockReleaseRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.StockReserveRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.ProductResponse;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.StockOperationResponse;
-import id.ac.ui.cs.advprog.jsoninventoryservice.model.Product;
-import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
-import id.ac.ui.cs.advprog.jsoninventoryservice.repository.ProductRepository;
 import id.ac.ui.cs.advprog.jsoninventoryservice.security.JwtUtil;
 import id.ac.ui.cs.advprog.jsoninventoryservice.service.StockManagementService;
 import org.junit.jupiter.api.Test;
@@ -38,9 +35,6 @@ class InternalProductControllerTest {
     private StockManagementService stockService;
 
     @MockitoBean
-    private ProductRepository productRepository;
-
-    @MockitoBean
     private JwtUtil jwtUtil;
 
     @Autowired
@@ -51,13 +45,6 @@ class InternalProductControllerTest {
         UUID productId = UUID.randomUUID();
         StockReserveRequest req = new StockReserveRequest();
         req.setQuantity(2);
-
-        Product product = new Product();
-        product.setProductId(productId);
-        product.setStatus(ProductStatus.ACTIVE);
-        product.setStock(10);
-
-        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
 
         when(stockService.reserveStock(eq(productId), any())).thenReturn(Optional.of(
                 StockOperationResponse.builder()
@@ -75,22 +62,17 @@ class InternalProductControllerTest {
     }
 
     @Test
-    void reserveStock_Fail() throws Exception {
+    void reserveStock_Fail_ReturnsBadRequest() throws Exception {
         UUID productId = UUID.randomUUID();
         StockReserveRequest req = new StockReserveRequest();
         req.setQuantity(20);
 
-        Product product = new Product();
-        product.setProductId(productId);
-        product.setStatus(ProductStatus.ACTIVE);
-        product.setStock(10);
-
-        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+        when(stockService.reserveStock(eq(productId), any())).thenReturn(Optional.empty());
 
         mockMvc.perform(post("/internal/products/{id}/stock/reserve", productId)
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isConflict());
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -167,58 +149,5 @@ class InternalProductControllerTest {
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false));
-    }
-
-    @Test
-    void reserveStock_NotFound_ThrowsException() throws Exception {
-        UUID productId = UUID.randomUUID();
-        StockReserveRequest req = new StockReserveRequest();
-        req.setQuantity(2);
-
-        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.empty());
-
-        mockMvc.perform(post("/internal/products/{id}/stock/reserve", productId)
-                        .contentType(APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    void reserveStock_NotActive_ThrowsException() throws Exception {
-        UUID productId = UUID.randomUUID();
-        StockReserveRequest req = new StockReserveRequest();
-        req.setQuantity(2);
-
-        Product product = new Product();
-        product.setProductId(productId);
-        product.setStock(10);
-        product.setStatus(ProductStatus.OUT_OF_STOCK);
-
-        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
-
-        mockMvc.perform(post("/internal/products/{id}/stock/reserve", productId)
-                        .contentType(APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isUnprocessableEntity());
-    }
-
-    @Test
-    void testReserveStock_ReservationFailed_Returns500() throws Exception {
-        Product p = new Product();
-        p.setStatus(ProductStatus.ACTIVE);
-        p.setStock(10);
-
-        when(productRepository.findByIdForUpdate(any())).thenReturn(Optional.of(p));
-        when(stockService.reserveStock(any(), any())).thenReturn(Optional.empty());
-
-        StockReserveRequest req = new StockReserveRequest();
-        req.setOrderId(UUID.randomUUID());
-        req.setQuantity(2);
-
-        ObjectMapper mapper = new ObjectMapper();
-        mockMvc.perform(post("/internal/products/" + UUID.randomUUID() + "/stock/reserve")
-                        .contentType(APPLICATION_JSON)
-                        .content(mapper.writeValueAsString(req)))
-                .andExpect(status().isInternalServerError());
     }
 }

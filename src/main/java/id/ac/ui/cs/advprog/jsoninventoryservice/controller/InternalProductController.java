@@ -6,9 +6,6 @@ import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.StockReserveRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.ProductResponse;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.StockOperationResponse;
 import id.ac.ui.cs.advprog.jsoninventoryservice.exception.StockOperationException;
-import id.ac.ui.cs.advprog.jsoninventoryservice.model.Product;
-import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
-import id.ac.ui.cs.advprog.jsoninventoryservice.repository.ProductRepository;
 import id.ac.ui.cs.advprog.jsoninventoryservice.service.StockManagementService;
 import id.ac.ui.cs.advprog.jsoninventoryservice.utils.ApiResponse;
 import id.ac.ui.cs.advprog.jsoninventoryservice.utils.ResponseUtil;
@@ -24,20 +21,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class InternalProductController {
     private final StockManagementService stockService;
-    private final ProductRepository productRepository;
 
     @PostMapping("/{id}/stock/reserve")
     public ResponseEntity<StockOperationResponse> reserveStock(@PathVariable UUID id, @Valid @RequestBody StockReserveRequest request) {
-        Product product = productRepository.findByIdForUpdate(id).orElseThrow(() -> new StockOperationException("Product not found", 404));
+        StockOperationResponse response = stockService.reserveStock(id, request)
+                .orElseThrow(() -> new StockOperationException("Reservation failed. Product not found, inactive, or insufficient stock.", 400));
 
-        if (product.getStatus() != ProductStatus.ACTIVE) {
-            throw new StockOperationException("Product is not available for purchase", 422);
-        }
-        if (product.getStock() < request.getQuantity()) {
-            throw new StockOperationException("Insufficient stock", 409);
-        }
-
-        StockOperationResponse response = stockService.reserveStock(id, request).orElseThrow(() -> new StockOperationException("Reservation failed", 500));
         return ResponseEntity.ok(response);
     }
 

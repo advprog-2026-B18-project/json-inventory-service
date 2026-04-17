@@ -844,4 +844,53 @@ class ProductServiceImplTest {
         assertEquals(1, result.getContent().getFirst().getImages().size());
         assertEquals("img1.jpg", result.getContent().getFirst().getImages().getFirst());
     }
+
+    @Test
+    void testUpdateProduct_WithNullImagesAndTags_Coverage() {
+        UUID productId = UUID.randomUUID();
+        UUID jastiperId = UUID.randomUUID();
+
+        ProductUpdateRequest updateReq = new ProductUpdateRequest();
+        updateReq.setName("New Name");
+        updateReq.setPrice(1000L);
+
+        Product product = new Product();
+        product.setProductId(productId);
+        product.setJastiperId(jastiperId);
+        product.setName("Old Name");
+        product.setDescription("Old Desc");
+        product.setStatus(ProductStatus.ACTIVE);
+        product.setPrice(500);
+        product.setStock(10);
+        product.setImages(null);
+        product.setTags(null);
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+        when(productRepository.save(any(Product.class))).thenReturn(product);
+
+        Optional<ProductResponse> response = productService.updateProduct(jastiperId, productId, updateReq);
+        assertTrue(response.isPresent());
+        verify(productRepository).findByIdForUpdate(productId);
+        verify(productRepository).save(any(Product.class));
+    }
+
+    @Test
+    void testGetMyCatalog_WithNullTags_Coverage() {
+        Product product = new Product();
+        product.setProductId(UUID.randomUUID());
+        product.setJastiperId(UUID.randomUUID());
+        product.setStatus(ProductStatus.ACTIVE);
+        product.setPrice(1000);
+        product.setStock(10);
+        product.setTags(null);
+        product.setImages(null);
+
+        Page<Product> productPage = new PageImpl<>(List.of(product));
+        when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(productPage);
+
+        ProductSearchCriteria criteria = ProductSearchCriteria.builder().build();
+        Page<ProductResponse> response = productService.getMyCatalog(criteria, PageRequest.of(0, 10));
+        assertNotNull(response);
+        assertFalse(response.isEmpty());
+    }
 }

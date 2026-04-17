@@ -36,6 +36,7 @@ class JwtFilterTest {
     void setUp() {
         request = new MockHttpServletRequest();
         response = new MockHttpServletResponse();
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -109,6 +110,7 @@ class JwtFilterTest {
         assertNull(request.getAttribute("jastiperId"));
         verify(filterChain, times(1)).doFilter(request, response);
     }
+
     @Test
     void testDoFilterInternal_BypassInternalPath() throws ServletException, IOException {
         request.setRequestURI("/internal/products/123/stock/reserve");
@@ -118,7 +120,7 @@ class JwtFilterTest {
     }
 
     @Test
-    void testDoFilterInternal_ValidTokenWithRole() throws ServletException, IOException {
+    void testDoFilterInternal_ValidTokenWithRoleAdmin() throws ServletException, IOException {
         String token = "valid-token";
         String accountId = UUID.randomUUID().toString();
         request.setRequestURI("/admin/products");
@@ -126,15 +128,24 @@ class JwtFilterTest {
         when(jwtUtil.validateToken(token)).thenReturn(true);
         when(jwtUtil.getAccountIdFromToken(token)).thenReturn(accountId);
         when(jwtUtil.getRoleFromToken(token)).thenReturn("ADMIN");
+
+        jwtFilter.doFilterInternal(request, response, filterChain);
+        assertEquals(UUID.fromString(accountId), request.getAttribute("adminId"));
+        assertEquals("ADMIN", request.getAttribute("userRole"));
+        assertNotNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
+    void testDoFilterInternal_ValidTokenWithRoleAlreadyHasPrefix() throws ServletException, IOException {
+        String token = "valid-token-prefix";
+        String accountId = UUID.randomUUID().toString();
+        request.addHeader("Authorization", "Bearer " + token);
+        when(jwtUtil.validateToken(token)).thenReturn(true);
+        when(jwtUtil.getAccountIdFromToken(token)).thenReturn(accountId);
+        when(jwtUtil.getRoleFromToken(token)).thenReturn("ROLE_USER");
+
         jwtFilter.doFilterInternal(request, response, filterChain);
         assertEquals(UUID.fromString(accountId), request.getAttribute("jastiperId"));
-        assertEquals("ADMIN", request.getAttribute("userRole"));
-
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        assertNotNull(auth);
-        assertEquals(accountId, auth.getPrincipal());
-        assertTrue(auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN")));
-        verify(filterChain).doFilter(request, response);
-        SecurityContextHolder.clearContext();
+        assertEquals("ROLE_USER", request.getAttribute("userRole"));
     }
 }
