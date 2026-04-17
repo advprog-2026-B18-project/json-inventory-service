@@ -11,7 +11,7 @@ import java.io.IOException;
 
 @Component
 public class InternalApiKeyFilter extends OncePerRequestFilter {
-    @Value("${app.internal.api-key:secret-service-key}")
+    @Value("${INTERNAL_SERVICE_KEY:secret-service-key}")
     private String internalApiKey;
 
     @Override
