@@ -44,13 +44,12 @@ public final class ProductSpecification {
         if (criteria.getOriginCountry() != null && !criteria.getOriginCountry().trim().isEmpty()) {
             predicates.add(cb.equal(cb.lower(root.get("originCountry")), criteria.getOriginCountry().toLowerCase()));
         }
+
         if (criteria.getKeyword() != null && !criteria.getKeyword().trim().isEmpty()) {
-            Predicate ftsMatch = cb.isTrue(cb.function(
-                    "sql", Boolean.class,
-                    cb.literal("to_tsvector('indonesian', {alias}.name || ' ' || {alias}.description) @@ plainto_tsquery('indonesian', ?)"),
-                    cb.literal(criteria.getKeyword())
-            ));
-            predicates.add(ftsMatch);
+            String searchPattern = "%" + criteria.getKeyword().toLowerCase() + "%";
+            Predicate nameMatch = cb.like(cb.lower(root.get("name")), searchPattern);
+            Predicate descMatch = cb.like(cb.lower(root.get("description")), searchPattern);
+            predicates.add(cb.or(nameMatch, descMatch));
         }
     }
 }
