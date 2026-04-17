@@ -27,6 +27,7 @@ import java.util.*;
 @Service
 @Transactional
 @RequiredArgsConstructor
+@SuppressWarnings("ResultOfMethodCallIgnored")
 public class ProductServiceImpl implements ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
@@ -105,6 +106,9 @@ public class ProductServiceImpl implements ProductService {
     }
 
     private ProductResponse mapToThumbnailResponse(Product p) {
+        if (p.getTags() != null) p.getTags().size();
+        if (p.getImages() != null) p.getImages().size();
+
         ProductResponse res = ProductResponse.fromEntity(p);
         if (res.getImages() != null && !res.getImages().isEmpty()) {
             res.setImages(List.of(res.getImages().getFirst()));
@@ -113,6 +117,9 @@ public class ProductServiceImpl implements ProductService {
     }
 
     private ProductResponse enrichProductResponse(Product p) {
+        if (p.getTags() != null) p.getTags().size();
+        if (p.getImages() != null) p.getImages().size();
+
         ProductResponse res = ProductResponse.fromEntity(p);
         if (p.getCategoryId() != null) {
             categoryRepository.findById(p.getCategoryId()).ifPresent(cat -> {
@@ -154,7 +161,11 @@ public class ProductServiceImpl implements ProductService {
             updateBasicFields(existing, req);
             updateStockAndStatus(existing, req);
             updateCategory(existing, req);
-            return ProductResponse.fromEntity(productRepository.save(existing));
+
+            Product savedProduct = productRepository.save(existing);
+            if (savedProduct.getImages() != null) savedProduct.getImages().size();
+            if (savedProduct.getTags() != null) savedProduct.getTags().size();
+            return ProductResponse.fromEntity(savedProduct);
         });
     }
 
