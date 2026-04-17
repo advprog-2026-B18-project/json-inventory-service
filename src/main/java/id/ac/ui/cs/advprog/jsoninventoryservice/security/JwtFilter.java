@@ -46,11 +46,17 @@ public class JwtFilter extends OncePerRequestFilter {
                     String role = jwtUtil.getRoleFromToken(token);
 
                     if (accountId != null) {
-                        request.setAttribute("jastiperId", UUID.fromString(accountId));
+                        UUID uuidAccountId = UUID.fromString(accountId);
                         request.setAttribute("userRole", role);
+                        if ("ADMIN".equals(role)) {
+                            request.setAttribute("adminId", uuidAccountId);
+                        } else {
+                            request.setAttribute("jastiperId", uuidAccountId);
+                        }
 
                         if (role != null) {
-                            List<SimpleGrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role));
+                            String authorityRole = role.startsWith("ROLE_") ? role : "ROLE_" + role;
+                            List<SimpleGrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority(authorityRole));
                             UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(accountId, null, authorities);
                             SecurityContextHolder.getContext().setAuthentication(auth);
                         }
