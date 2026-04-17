@@ -23,9 +23,16 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("ResultOfMethodCallIgnored")
 public class StockManagementServiceImpl implements StockManagementService {
     private final ProductRepository productRepository;
     private final StockReservationRepository reservationRepository;
+
+    private ProductResponse mapToResponseSafe(Product p) {
+        if (p.getImages() != null) p.getImages().size();
+        if (p.getTags() != null) p.getTags().size();
+        return ProductResponse.fromEntity(p);
+    }
 
     @Override
     @Transactional
@@ -95,7 +102,7 @@ public class StockManagementServiceImpl implements StockManagementService {
             res.setStatus(ReservationStatus.RELEASED);
             reservationRepository.save(res);
 
-            return Optional.of(ProductResponse.fromEntity(p));
+            return Optional.of(mapToResponseSafe(p));
         }
         return Optional.empty();
     }
@@ -116,7 +123,8 @@ public class StockManagementServiceImpl implements StockManagementService {
             throw new IllegalArgumentException("Invalid action. Must be 'CONFIRM' or 'CANCEL'.");
         }
         productRepository.save(product);
-        return Optional.of(ProductResponse.fromEntity(product));
+
+        return Optional.of(mapToResponseSafe(product));
     }
 
     private void handleConfirmAction(Product product, PostOrderRequest request, Optional<StockReservation> optRes) {
