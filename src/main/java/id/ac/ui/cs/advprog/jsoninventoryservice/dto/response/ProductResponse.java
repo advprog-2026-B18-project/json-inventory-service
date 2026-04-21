@@ -1,5 +1,6 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.Product;
 import lombok.*;
 import java.time.LocalDate;
@@ -11,15 +12,20 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ProductResponse {
+    @JsonProperty("product_id")
     private UUID productId;
     private String name;
     private String description;
     private long price;
     private int stock;
     private String status;
+    @JsonProperty("origin_country")
     private String originCountry;
+    @JsonProperty("purchase_date")
     private LocalDate purchaseDate;
+    @JsonProperty("weight_gram")
     private Integer weightGram;
+    @JsonProperty("service_fee")
     private Long serviceFee;
     private List<String> images;
     private List<String> tags;

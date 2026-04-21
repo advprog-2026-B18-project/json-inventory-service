@@ -1,13 +1,16 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import java.util.UUID;
 
 @Data
 public class PostOrderRequest {
+    @JsonProperty("order_id")
     private UUID orderId;
     private String action;
     private Double rating;
+    @JsonProperty("review_text")
     private String reviewText;
     private String reason;
 }
