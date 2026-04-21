@@ -1,5 +1,6 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.controller;
 
+import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductSearchCriteria;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.ProductResponse;
 import id.ac.ui.cs.advprog.jsoninventoryservice.service.AuthIntegrationService;
 import id.ac.ui.cs.advprog.jsoninventoryservice.service.ProductService;
@@ -34,8 +35,16 @@ public class JastiperCatalogController {
 
         UUID jastiperId = authIntegrationService.getJastiperIdByUsername(username);
 
-        Page<ProductResponse> productPage = searchService.searchProductsPublic(q, jastiperId, minPrice, maxPrice, categoryId, originCountry, null, null, pageable);
+                ProductSearchCriteria criteria = ProductSearchCriteria.builder()
+                        .keyword(q)
+                        .jastiperId(jastiperId)
+                        .minPrice(minPrice)
+                        .maxPrice(maxPrice)
+                        .categoryId(categoryId)
+                        .originCountry(originCountry)
+                        .build();
 
+        Page<ProductResponse> productPage = searchService.searchProductsPublic(criteria, pageable);
         Map<String, Object> responseData = new HashMap<>();
         responseData.put("data", productPage.getContent());
 

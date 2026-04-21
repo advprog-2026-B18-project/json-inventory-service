@@ -1,6 +1,7 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.service;
 
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.AdminProductUpdateRequest;
+import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductSearchCriteria;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.ProductResponse;
 import id.ac.ui.cs.advprog.jsoninventoryservice.event.ProductModeratedEvent;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.ModerationLog;
@@ -23,29 +24,45 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
+@Transactional
 @RequiredArgsConstructor
+@SuppressWarnings("ResultOfMethodCallIgnored")
 public class AdminProductServiceImpl implements AdminProductService {
     private final ProductRepository productRepository;
     private final ModerationLogRepository moderationLogRepository;
     private final ApplicationEventPublisher eventPublisher;
 
+    private ProductResponse mapToResponse(Product p) {
+        if (p.getImages() != null) p.getImages().size();
+        if (p.getTags() != null) p.getTags().size();
+        return ProductResponse.fromEntity(p);
+    }
+
     @Override
     public Page<ProductResponse> getAllProductsAdmin(String keyword, UUID jastiperId, String status, Integer categoryId, Pageable pageable) {
         ProductStatus filterStatus = null;
         if (status != null && !status.trim().isEmpty()) {
-            try { filterStatus = ProductStatus.valueOf(status.toUpperCase()); }
-            catch (IllegalArgumentException ignored) {}
+            try {
+                filterStatus = ProductStatus.valueOf(status.toUpperCase());
+            } catch (IllegalArgumentException ignored) {
+                // Ignored
+            }
         }
 
-        Specification<Product> spec = ProductSpecification.searchProducts(
-                keyword, jastiperId, null, null, categoryId, filterStatus, null, null, null);
+        ProductSearchCriteria criteria = ProductSearchCriteria.builder()
+                .keyword(keyword)
+                .jastiperId(jastiperId)
+                .categoryId(categoryId)
+                .status(filterStatus)
+                .build();
+        Specification<Product> spec = ProductSpecification.searchProducts(criteria);
 
-        return productRepository.findAll(spec, pageable).map(ProductResponse::fromEntity);
+        return productRepository.findAll(spec, pageable).map(this::mapToResponse);
     }
 
     @Override
     public Optional<ProductResponse> getAdminProductDetail(UUID id) {
-        return productRepository.findById(id).map(ProductResponse::fromEntity);
+        return productRepository.findById(id).map(this::mapToResponse);
     }
 
     @Override
@@ -59,14 +76,16 @@ public class AdminProductServiceImpl implements AdminProductService {
                 throw new IllegalArgumentException("Invalid moderation action. Allowed: REMOVE, RESTORE, HIDE, ACTIVATE");
             }
 
-            if (action == ModerationAction.HIDE) {
-                product.setStatus(ProductStatus.HIDDEN);
-            } else if (action == ModerationAction.REMOVE) {
-                product.setStatus(ProductStatus.HIDDEN);
-                product.setDeletedAt(LocalDateTime.now());
-            } else {
-                product.setStatus(ProductStatus.ACTIVE);
-                product.setDeletedAt(null);
+            switch (action) {
+                case HIDE -> product.setStatus(ProductStatus.HIDDEN);
+                case REMOVE -> {
+                    product.setStatus(ProductStatus.HIDDEN);
+                    product.setDeletedAt(LocalDateTime.now());
+                }
+                default -> {
+                    product.setStatus(ProductStatus.ACTIVE);
+                    product.setDeletedAt(null);
+                }
             }
             productRepository.save(product);
 
@@ -78,8 +97,7 @@ public class AdminProductServiceImpl implements AdminProductService {
             moderationLogRepository.save(log);
 
             eventPublisher.publishEvent(new ProductModeratedEvent(product.getProductId(), adminId, action.name(), request.getReason(), product.getName(), product.getJastiperId()));
-
-            return ProductResponse.fromEntity(product);
+            return mapToResponse(product);
         });
     }
 }

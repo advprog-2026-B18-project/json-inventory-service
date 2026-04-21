@@ -1,14 +1,13 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.specification;
 
+import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductSearchCriteria;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.Product;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
+import jakarta.persistence.criteria.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.jpa.domain.Specification;
-import jakarta.persistence.criteria.CriteriaBuilder;
-import jakarta.persistence.criteria.CriteriaQuery;
-import jakarta.persistence.criteria.Path;
-import jakarta.persistence.criteria.Predicate;
-import jakarta.persistence.criteria.Root;
+
+import java.lang.reflect.Constructor;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -17,69 +16,78 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
+@SuppressWarnings("unchecked")
 class ProductSpecificationTest {
     @Test
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    void testSearchProducts_AllFilters() {
-        Root<Product> root = mock(Root.class);
-        CriteriaQuery<?> query = mock(CriteriaQuery.class);
+    void testConstructorIsPrivate() throws Exception {
+        Constructor<ProductSpecification> constructor = ProductSpecification.class.getDeclaredConstructor();
+        constructor.setAccessible(true);
+        ProductSpecification instance = constructor.newInstance();
+        assertNotNull(instance);
+    }
+
+    @Test
+    void testSpecification_WithAllRangeAndTextCriteria() {
+        ProductSearchCriteria criteria = ProductSearchCriteria.builder()
+                .minPrice(100L)
+                .maxPrice(500L)
+                .dateFrom(LocalDate.now().minusDays(1))
+                .dateTo(LocalDate.now())
+                .originCountry("US")
+                .keyword("laptop")
+                .status(ProductStatus.ACTIVE)
+                .categoryId(1)
+                .jastiperId(UUID.randomUUID())
+                .build();
+
+        Specification<Product> spec = ProductSpecification.searchProducts(criteria);
         CriteriaBuilder cb = mock(CriteriaBuilder.class);
-        Path path = mock(Path.class);
+        CriteriaQuery<?> cq = mock(CriteriaQuery.class);
+        Root<Product> root = mock(Root.class);
+        Path<Object> path = mock(Path.class);
 
         when(root.get(anyString())).thenReturn(path);
         when(cb.equal(any(), any())).thenReturn(mock(Predicate.class));
-        when(cb.greaterThanOrEqualTo(any(Path.class), any(Integer.class))).thenReturn(mock(Predicate.class));
-        when(cb.lessThanOrEqualTo(any(Path.class), any(Integer.class))).thenReturn(mock(Predicate.class));
-        when(cb.greaterThanOrEqualTo(any(Path.class), any(LocalDate.class))).thenReturn(mock(Predicate.class));
-        when(cb.lessThanOrEqualTo(any(Path.class), any(LocalDate.class))).thenReturn(mock(Predicate.class));
-        when(cb.like(any(), anyString())).thenReturn(mock(Predicate.class));
-        when(cb.or(any(), any())).thenReturn(mock(Predicate.class));
+        when(cb.greaterThanOrEqualTo(any(Expression.class), any(Integer.class))).thenReturn(mock(Predicate.class));
+        when(cb.lessThanOrEqualTo(any(Expression.class), any(Integer.class))).thenReturn(mock(Predicate.class));
+        when(cb.greaterThanOrEqualTo(any(Expression.class), any(LocalDate.class))).thenReturn(mock(Predicate.class));
+        when(cb.lessThanOrEqualTo(any(Expression.class), any(LocalDate.class))).thenReturn(mock(Predicate.class));
+        when(cb.lower(any())).thenReturn(mock(Expression.class));
+        when(cb.literal(any())).thenReturn(mock(Expression.class));
+        when(cb.function(anyString(), eq(Boolean.class), any(), any())).thenReturn(mock(Expression.class));
+        when(cb.isTrue(any())).thenReturn(mock(Predicate.class));
         when(cb.isNull(any())).thenReturn(mock(Predicate.class));
         when(cb.and(any(Predicate[].class))).thenReturn(mock(Predicate.class));
-        when(cb.lower(any())).thenReturn(path);
 
-        Specification<Product> spec = ProductSpecification.searchProducts("keyword", UUID.randomUUID(), 100L, 1000L, 1, ProductStatus.ACTIVE, "ID", LocalDate.now().minusDays(1), LocalDate.now());
-        Predicate predicate = spec.toPredicate(root, query, cb);
-        assertNotNull(predicate);
+        Predicate result = spec.toPredicate(root, cq, cb);
+        assertNotNull(result);
     }
 
     @Test
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    void testSearchProducts_NoFilters() {
-        Root<Product> root = mock(Root.class);
-        CriteriaQuery<?> query = mock(CriteriaQuery.class);
+    void testSpecification_WithNullRangeAndEmptyTextCriteria() {
+        ProductSearchCriteria criteria = ProductSearchCriteria.builder()
+                .minPrice(null)
+                .maxPrice(null)
+                .dateFrom(null)
+                .dateTo(null)
+                .originCountry("   ")
+                .keyword("   ")
+                .status(null)
+                .categoryId(null)
+                .jastiperId(null)
+                .build();
+
+        Specification<Product> spec = ProductSpecification.searchProducts(criteria);
         CriteriaBuilder cb = mock(CriteriaBuilder.class);
-        Path path = mock(Path.class);
+        CriteriaQuery<?> cq = mock(CriteriaQuery.class);
+        Root<Product> root = mock(Root.class);
+        Path<Object> path = mock(Path.class);
 
         when(root.get(anyString())).thenReturn(path);
         when(cb.isNull(any())).thenReturn(mock(Predicate.class));
         when(cb.and(any(Predicate[].class))).thenReturn(mock(Predicate.class));
 
-        Specification<Product> spec = ProductSpecification.searchProducts(null, null, null, null, null, null, null, null, null);
-        Predicate predicate = spec.toPredicate(root, query, cb);
-        assertNotNull(predicate);
-    }
-
-    @Test
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    void testSearchProducts_EmptyStrings() {
-        Root<Product> root = mock(Root.class);
-        CriteriaQuery<?> query = mock(CriteriaQuery.class);
-        CriteriaBuilder cb = mock(CriteriaBuilder.class);
-        Path path = mock(Path.class);
-
-        when(root.get(anyString())).thenReturn(path);
-        when(cb.isNull(any())).thenReturn(mock(Predicate.class));
-        when(cb.and(any(Predicate[].class))).thenReturn(mock(Predicate.class));
-
-        Specification<Product> spec = ProductSpecification.searchProducts("   ", null, null, null, null, null, "   ", null, null);
-        Predicate predicate = spec.toPredicate(root, query, cb);
-        assertNotNull(predicate);
-    }
-
-    @Test
-    void testPrivateConstructor() {
-        ProductSpecification spec = new ProductSpecification();
-        assertNotNull(spec);
+        Predicate result = spec.toPredicate(root, cq, cb);
+        assertNotNull(result);
     }
 }

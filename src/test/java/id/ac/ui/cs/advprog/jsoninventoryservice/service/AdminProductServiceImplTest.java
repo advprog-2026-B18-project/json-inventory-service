@@ -207,4 +207,23 @@ class AdminProductServiceImplTest {
         verify(moderationLogRepository).save(any(ModerationLog.class));
         verify(eventPublisher, times(1)).publishEvent(any(ProductModeratedEvent.class));
     }
+
+    @Test
+    void testGetAdminProductDetail_WithNullImagesAndTags_Coverage() {
+        UUID productId = UUID.randomUUID();
+        Product p = new Product();
+        p.setProductId(productId);
+        p.setJastiperId(UUID.randomUUID());
+        p.setStatus(ProductStatus.ACTIVE);
+        p.setPrice(150000);
+        p.setStock(10);
+        p.setImages(null);
+        p.setTags(null);
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(p));
+
+        Optional<ProductResponse> response = adminService.getAdminProductDetail(productId);
+        assertTrue(response.isPresent());
+        assertNull(response.get().getImages());
+    }
 }

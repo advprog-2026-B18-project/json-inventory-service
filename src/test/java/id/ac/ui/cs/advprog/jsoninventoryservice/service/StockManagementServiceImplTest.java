@@ -663,4 +663,32 @@ class StockManagementServiceImplTest {
         assertNotNull(response.get().getReservationId());
         assertEquals(8, product.getStock());
     }
+
+    @Test
+    void testReleaseStock_WithNullImagesAndTags_Coverage() {
+        UUID productId = UUID.randomUUID();
+        UUID orderId = UUID.randomUUID();
+        StockReleaseRequest req = new StockReleaseRequest();
+        req.setOrderId(orderId);
+        req.setQuantity(2);
+
+        Product p = new Product();
+        p.setProductId(productId);
+        p.setJastiperId(UUID.randomUUID());
+        p.setStatus(ProductStatus.ACTIVE);
+        p.setPrice(10000);
+        p.setStock(10);
+        p.setImages(null);
+        p.setTags(null);
+
+        StockReservation res = new StockReservation();
+        res.setProduct(p);
+        res.setStatus(ReservationStatus.PENDING);
+        res.setQuantity(2);
+
+        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(res));
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(p));
+        Optional<ProductResponse> response = stockService.releaseStock(productId, req);
+        assertTrue(response.isPresent());
+    }
 }

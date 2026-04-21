@@ -9,23 +9,24 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    private static final String MESSAGE_KEY = "message";
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidationErrors(MethodArgumentNotValidException ex) {
-        List<Map<String, String>> errors = ex.getBindingResult().getFieldErrors().stream().map(err -> {
-            Map<String, String> errorMap = new HashMap<>();
-            errorMap.put("field", err.getField());
-            errorMap.put("message", err.getDefaultMessage());
-            return errorMap;
-        }).collect(Collectors.toList());
+        List<Map<String, String>> errors = ex.getBindingResult().getFieldErrors()
+                .stream().map(err -> {
+                    Map<String, String> errorMap = new HashMap<>();
+                    errorMap.put("field", err.getField());
+                    errorMap.put(MESSAGE_KEY, err.getDefaultMessage());
+                    return errorMap;
+                }).toList();
 
         Map<String, Object> response = new HashMap<>();
         response.put("success", false);
-        response.put("message", "Validation Failed");
+        response.put(MESSAGE_KEY, "Validation Failed");
         response.put("errors", errors);
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
