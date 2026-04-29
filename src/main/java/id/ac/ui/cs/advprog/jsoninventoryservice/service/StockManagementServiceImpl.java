@@ -63,7 +63,6 @@ public class StockManagementServiceImpl implements StockManagementService {
                     .orderId(req.getOrderId())
                     .quantity(req.getQuantity())
                     .status(ReservationStatus.PENDING)
-                    .expiresAt(LocalDateTime.now().plusMinutes(15))
                     .build();
             res = reservationRepository.save(res);
 
@@ -159,26 +158,6 @@ public class StockManagementServiceImpl implements StockManagementService {
                 product.setStock(0);
                 product.setStatus(ProductStatus.OUT_OF_STOCK);
             }
-            res.setStatus(ReservationStatus.RELEASED);
-            reservationRepository.save(res);
-        }
-    }
-
-    @Override
-    @Transactional
-    @Scheduled(fixedRate = 60000)
-    public void cleanupExpiredReservations() {
-        LocalDateTime now = LocalDateTime.now();
-        List<StockReservation> expiredReservations = reservationRepository.findExpiredReservations(now);
-
-        for (StockReservation res : expiredReservations) {
-            Product p = res.getProduct();
-            p.setStock(p.getStock() + res.getQuantity());
-            if (p.getStatus() == ProductStatus.OUT_OF_STOCK && p.getStock() > 0) {
-                p.setStatus(ProductStatus.ACTIVE);
-            }
-            productRepository.save(p);
-
             res.setStatus(ReservationStatus.RELEASED);
             reservationRepository.save(res);
         }

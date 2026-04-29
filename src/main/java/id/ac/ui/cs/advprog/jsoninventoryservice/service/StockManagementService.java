@@ -11,6 +11,5 @@ import java.util.UUID;
 
 public interface StockManagementService {
     Optional<StockOperationResponse> reserveStock(UUID id, StockReserveRequest request); Optional<ProductResponse> releaseStock(UUID id, StockReleaseRequest request);
-    void cleanupExpiredReservations();
     Optional<ProductResponse> processPostOrder(UUID id, PostOrderRequest request);
 }
