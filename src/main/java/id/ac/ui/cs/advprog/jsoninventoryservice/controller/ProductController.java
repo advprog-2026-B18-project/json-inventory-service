@@ -31,7 +31,7 @@ public class ProductController {
     private final ProductService productService;
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<ProductResponse>> getProductDetailPublic(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<ProductResponse>> getProductDetailPublic(@PathVariable("id") UUID id) {
         return productService.getProductById(id).map(p -> ResponseUtil.success(p, "Successfully fetched product details."))
                 .orElse(ResponseUtil.notFound("Product not found with ID: " + id));
     }
@@ -48,7 +48,7 @@ public class ProductController {
     @PatchMapping("/{id}")
     public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
             @RequestAttribute("jastiperId") UUID jastiperId,
-            @PathVariable UUID id,
+            @PathVariable("id") UUID id,
             @Valid @RequestBody ProductUpdateRequest request) {
         return productService.updateProduct(jastiperId, id, request)
                 .map(p -> ResponseUtil.success(p, "Product updated successfully."))
@@ -59,7 +59,7 @@ public class ProductController {
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteProduct(
             @RequestAttribute("jastiperId") UUID jastiperId,
-            @PathVariable UUID id) {
+            @PathVariable("id") UUID id) {
         productService.deleteProduct(jastiperId, id);
         return ResponseUtil.success(null, "Product deleted successfully.");
     }
@@ -144,7 +144,7 @@ public class ProductController {
     @GetMapping("/my/{id}")
     public ResponseEntity<ApiResponse<ProductResponse>> getMyProductDetail(
             @RequestAttribute("jastiperId") UUID jastiperId,
-            @PathVariable UUID id) {
+            @PathVariable("id") UUID id) {
 
         return productService.getProductById(id)
                 .filter(p -> p.getJastiper() != null && p.getJastiper().getUserId().equals(jastiperId))
