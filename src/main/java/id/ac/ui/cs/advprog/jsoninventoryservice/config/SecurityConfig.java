@@ -35,6 +35,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/jastipers/**").permitAll()
                 .requestMatchers("/error").permitAll()
                 .requestMatchers("/internal/**").permitAll()
+                .requestMatchers("/products/internal/**").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(internalApiKeyFilter, UsernamePasswordAuthenticationFilter.class)
