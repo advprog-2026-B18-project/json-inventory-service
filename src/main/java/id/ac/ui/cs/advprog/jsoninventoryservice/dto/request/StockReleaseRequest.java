@@ -12,6 +12,4 @@ public class StockReleaseRequest {
 
     @Positive(message = "Quantity must be greater than zero")
     private Integer quantity;
-
-    private String reason;
 }
