@@ -520,44 +520,6 @@ class StockManagementServiceImplTest {
     }
 
     @Test
-    void releaseStock_ReasonPhysicalEmpty_Branch() {
-        StockReleaseRequest req = new StockReleaseRequest();
-        req.setOrderId(orderId);
-        req.setQuantity(2);
-        req.setReason("OUT_OF_STOCK");
-        StockReservation res = new StockReservation();
-        res.setStatus(ReservationStatus.PENDING);
-        res.setQuantity(2);
-        product.setStock(5);
-        product.setStatus(ProductStatus.ACTIVE);
-
-        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(res));
-        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
-        stockService.releaseStock(productId, req);
-        assertEquals(0, product.getStock());
-        assertEquals(ProductStatus.OUT_OF_STOCK, product.getStatus());
-    }
-
-    @Test
-    void processPostOrder_Cancel_ReasonPhysicalEmpty_Branch() {
-        PostOrderRequest req = new PostOrderRequest();
-        req.setOrderId(orderId);
-        req.setAction("CANCEL");
-        req.setReason("OUT_OF_STOCK");
-        StockReservation res = new StockReservation();
-        res.setStatus(ReservationStatus.PENDING);
-        res.setQuantity(3);
-        product.setStock(5);
-        product.setStatus(ProductStatus.ACTIVE);
-
-        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(res));
-        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
-        stockService.processPostOrder(productId, req);
-        assertEquals(0, product.getStock());
-        assertEquals(ProductStatus.OUT_OF_STOCK, product.getStatus());
-    }
-
-    @Test
     void processPostOrder_Confirm_PendingRes_TotalOrdersNull_Branch() {
         PostOrderRequest req = new PostOrderRequest();
         req.setOrderId(orderId);

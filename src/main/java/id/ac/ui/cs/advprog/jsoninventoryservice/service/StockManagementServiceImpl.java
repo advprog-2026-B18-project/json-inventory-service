@@ -85,16 +85,9 @@ public class StockManagementServiceImpl implements StockManagementService {
             StockReservation res = optRes.get();
             Product p = productRepository.findByIdForUpdate(id).orElseThrow();
 
-            boolean isPhysicalStockEmpty = "OUT_OF_STOCK".equalsIgnoreCase(req.getReason());
-
-            if (!isPhysicalStockEmpty) {
-                p.setStock(p.getStock() + res.getQuantity());
-                if (p.getStatus() == ProductStatus.OUT_OF_STOCK && p.getStock() > 0) {
-                    p.setStatus(ProductStatus.ACTIVE);
-                }
-            } else {
-                p.setStock(0);
-                p.setStatus(ProductStatus.OUT_OF_STOCK);
+            p.setStock(p.getStock() + res.getQuantity());
+            if (p.getStatus() == ProductStatus.OUT_OF_STOCK && p.getStock() > 0) {
+                p.setStatus(ProductStatus.ACTIVE);
             }
 
             productRepository.save(p);
@@ -147,16 +140,10 @@ public class StockManagementServiceImpl implements StockManagementService {
     private void handleCancelAction(Product product, PostOrderRequest request, Optional<StockReservation> optRes) {
         if (optRes.isPresent() && optRes.get().getStatus() != ReservationStatus.RELEASED) {
             StockReservation res = optRes.get();
-            boolean isPhysicalStockEmpty = "OUT_OF_STOCK".equalsIgnoreCase(request.getReason());
 
-            if (!isPhysicalStockEmpty) {
-                product.setStock(product.getStock() + res.getQuantity());
-                if (product.getStatus() == ProductStatus.OUT_OF_STOCK && product.getStock() > 0) {
-                    product.setStatus(ProductStatus.ACTIVE);
-                }
-            } else {
-                product.setStock(0);
-                product.setStatus(ProductStatus.OUT_OF_STOCK);
+            product.setStock(product.getStock() + res.getQuantity());
+            if (product.getStatus() == ProductStatus.OUT_OF_STOCK && product.getStock() > 0) {
+                product.setStatus(ProductStatus.ACTIVE);
             }
             res.setStatus(ReservationStatus.RELEASED);
             reservationRepository.save(res);
