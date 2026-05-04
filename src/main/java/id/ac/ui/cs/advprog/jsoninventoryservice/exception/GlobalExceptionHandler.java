@@ -1,5 +1,8 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.exception;
 
+import id.ac.ui.cs.advprog.jsoninventoryservice.utils.ApiResponse;
+import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -64,6 +67,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(StockOperationException.class)
     public ResponseEntity<Map<String, Object>> handleStockOperation(StockOperationException ex) {
         return buildErrorResponse(HttpStatus.valueOf(ex.getStatusCode()), ex.getMessage(), null);
+    }
+
+    @ExceptionHandler({CannotAcquireLockException.class, PessimisticLockingFailureException.class})
+    public ResponseEntity<ApiResponse<Object>> handleConcurrencyFailure(Exception ex) {
+        ApiResponse<Object> response = new ApiResponse<>();
+        response.setSuccess(false);
+        response.setMessage("High traffic volume. Please try again in a moment.");
+        return new ResponseEntity<>(response, HttpStatus.CONFLICT);
     }
 
     private ResponseEntity<Map<String, Object>> buildErrorResponse(HttpStatus status, String message, List<String> errors) {
