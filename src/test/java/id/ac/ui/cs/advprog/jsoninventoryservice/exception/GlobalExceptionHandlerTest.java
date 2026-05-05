@@ -1,8 +1,11 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.exception;
 
+import id.ac.ui.cs.advprog.jsoninventoryservice.utils.ApiResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
@@ -133,5 +136,29 @@ class GlobalExceptionHandlerTest {
                         method.invoke(handler, HttpStatus.BAD_REQUEST, "Test False", null);
 
         assertNull(falseResponse.getBody().get("errors"));
+    }
+
+    @Test
+    void testHandleConcurrencyFailure_CannotAcquireLockException() {
+        CannotAcquireLockException exception = new CannotAcquireLockException("Lock wait timeout exceeded");
+        ResponseEntity<ApiResponse<Object>> responseEntity = exceptionHandler.handleConcurrencyFailure(exception);
+
+        assertNotNull(responseEntity);
+        assertEquals(HttpStatus.CONFLICT, responseEntity.getStatusCode());
+        assertNotNull(responseEntity.getBody());
+        assertFalse(responseEntity.getBody().isSuccess());
+        assertEquals("High traffic volume. Please try again in a moment.", responseEntity.getBody().getMessage());
+    }
+
+    @Test
+    void testHandleConcurrencyFailure_PessimisticLockingFailureException() {
+        PessimisticLockingFailureException exception = new PessimisticLockingFailureException("Pessimistic locking failed");
+        ResponseEntity<ApiResponse<Object>> responseEntity = exceptionHandler.handleConcurrencyFailure(exception);
+
+        assertNotNull(responseEntity);
+        assertEquals(HttpStatus.CONFLICT, responseEntity.getStatusCode());
+        assertNotNull(responseEntity.getBody());
+        assertFalse(responseEntity.getBody().isSuccess());
+        assertEquals("High traffic volume. Please try again in a moment.", responseEntity.getBody().getMessage());
     }
 }

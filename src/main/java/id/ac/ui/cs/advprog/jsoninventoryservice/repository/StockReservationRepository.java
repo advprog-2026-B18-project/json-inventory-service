@@ -19,7 +19,4 @@ public interface StockReservationRepository extends JpaRepository<StockReservati
 
     @Query("SELECT COUNT(sr) FROM StockReservation sr WHERE sr.product.productId = :productId AND sr.status IN :statuses")
     long countByProductProductIdAndStatusIn(@Param("productId") UUID productId, @Param("statuses") List<ReservationStatus> statuses);
-
-    @Query("SELECT r FROM StockReservation r WHERE r.status = 'PENDING' AND r.expiresAt < :now")
-    List<StockReservation> findExpiredReservations(@Param("now") LocalDateTime now);
 }

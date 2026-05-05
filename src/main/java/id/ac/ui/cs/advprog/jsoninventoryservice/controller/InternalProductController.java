@@ -23,7 +23,7 @@ public class InternalProductController {
     private final StockManagementService stockService;
 
     @PostMapping("/{id}/stock/reserve")
-    public ResponseEntity<StockOperationResponse> reserveStock(@PathVariable UUID id, @Valid @RequestBody StockReserveRequest request) {
+    public ResponseEntity<StockOperationResponse> reserveStock(@PathVariable("id") UUID id, @Valid @RequestBody StockReserveRequest request) {
         StockOperationResponse response = stockService.reserveStock(id, request)
                 .orElseThrow(() -> new StockOperationException("Reservation failed. Product not found, inactive, or insufficient stock.", 400));
 
@@ -31,7 +31,7 @@ public class InternalProductController {
     }
 
     @PostMapping("/{id}/stock/release")
-    public ResponseEntity<ApiResponse<ProductResponse>> releaseStock(@PathVariable UUID id, @Valid @RequestBody StockReleaseRequest request) {
+    public ResponseEntity<ApiResponse<ProductResponse>> releaseStock(@PathVariable("id") UUID id, @Valid @RequestBody StockReleaseRequest request) {
         return stockService.releaseStock(id, request)
                 .map(p -> ResponseUtil.success(p, "Stock released successfully."))
                 .orElse(ResponseUtil.notFound("Reservation not found or already released."));
@@ -39,7 +39,7 @@ public class InternalProductController {
 
     @PostMapping("/{id}/post-order")
     public ResponseEntity<ApiResponse<ProductResponse>> processPostOrder(
-            @PathVariable UUID id,
+            @PathVariable("id") UUID id,
             @Valid @RequestBody PostOrderRequest request) {
 
         try {

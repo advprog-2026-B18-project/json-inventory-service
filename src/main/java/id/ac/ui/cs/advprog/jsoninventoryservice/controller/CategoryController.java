@@ -33,7 +33,7 @@ public class CategoryController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<Void>> deleteCategory(@PathVariable Integer id) {
+    public ResponseEntity<ApiResponse<Void>> deleteCategory(@PathVariable("id") Integer id) {
         try {
             categoryService.deleteCategory(id);
             return ResponseUtil.success(null, "Category successfully deleted.");
@@ -49,7 +49,7 @@ public class CategoryController {
 
     @PatchMapping("/{id}")
     public ResponseEntity<ApiResponse<CategoryResponse>> updateCategory(
-            @PathVariable Integer id,
+            @PathVariable("id") Integer id,
             @RequestBody CategoryRequest request) {
         try {
             return ResponseUtil.success(categoryService.updateCategory(id, request), "Category updated successfully.");

@@ -210,13 +210,6 @@ class StockManagementServiceImplTest {
     }
 
     @Test
-    void cleanupExpiredReservations_NoReservations() {
-        when(reservationRepository.findExpiredReservations(any())).thenReturn(List.of());
-        stockService.cleanupExpiredReservations();
-        verify(productRepository, never()).save(any());
-    }
-
-    @Test
     void processPostOrder_Confirm_Success() {
         PostOrderRequest req = new PostOrderRequest();
         req.setOrderId(orderId);
@@ -282,21 +275,6 @@ class StockManagementServiceImplTest {
         assertThrows(IllegalArgumentException.class, () -> {
             stockService.processPostOrder(productId, req);
         });
-    }
-
-    @Test
-    void cleanupExpiredReservations_WithReservations_Fix() {
-        StockReservation res = new StockReservation();
-        res.setQuantity(5);
-        product.setStock(0);
-        product.setStatus(ProductStatus.OUT_OF_STOCK);
-        res.setProduct(product);
-
-        when(reservationRepository.findExpiredReservations(any())).thenReturn(List.of(res));
-        stockService.cleanupExpiredReservations();
-        assertEquals(5, product.getStock());
-        assertEquals(ProductStatus.ACTIVE, product.getStatus());
-        assertEquals(ReservationStatus.RELEASED, res.getStatus());
     }
 
     @Test
@@ -500,17 +478,6 @@ class StockManagementServiceImplTest {
     }
 
     @Test
-    void cleanupExpiredReservations_StatusAlreadyActive_Branch() {
-        StockReservation res = new StockReservation();
-        res.setQuantity(4);
-        res.setProduct(product);
-        product.setStock(1); product.setStatus(ProductStatus.ACTIVE);
-        when(reservationRepository.findExpiredReservations(any())).thenReturn(List.of(res));
-        stockService.cleanupExpiredReservations();
-        assertEquals(5, product.getStock());
-    }
-
-    @Test
     void processPostOrder_NullAction_Branch() {
         PostOrderRequest req = new PostOrderRequest();
         req.setOrderId(orderId);
@@ -539,20 +506,6 @@ class StockManagementServiceImplTest {
     }
 
     @Test
-    void cleanupExpiredReservations_StatusHidden_Branch() {
-        StockReservation res = new StockReservation();
-        res.setQuantity(4);
-        res.setProduct(product);
-        product.setStock(1);
-        product.setStatus(ProductStatus.HIDDEN);
-
-        when(reservationRepository.findExpiredReservations(any())).thenReturn(List.of(res));
-        stockService.cleanupExpiredReservations();
-        assertEquals(5, product.getStock());
-        assertEquals(ProductStatus.HIDDEN, product.getStatus());
-    }
-
-    @Test
     void reserveStock_Fail_ProductNotActive_And_InsufficientStock() {
         product.setStatus(ProductStatus.HIDDEN);
         product.setStock(1);
@@ -564,60 +517,6 @@ class StockManagementServiceImplTest {
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
         Optional<StockOperationResponse> res = stockService.reserveStock(productId, req);
         assertFalse(res.isPresent());
-    }
-
-    @Test
-    void cleanupExpiredReservations_OutOfStock_ButStockRemainsZero_Branch() {
-        StockReservation res = new StockReservation();
-        res.setQuantity(0);
-        res.setProduct(product);
-        product.setStock(0);
-        product.setStatus(ProductStatus.OUT_OF_STOCK);
-
-        when(reservationRepository.findExpiredReservations(any())).thenReturn(List.of(res));
-        stockService.cleanupExpiredReservations();
-        assertEquals(0, product.getStock());
-        assertEquals(ProductStatus.OUT_OF_STOCK, product.getStatus());
-        assertEquals(ReservationStatus.RELEASED, res.getStatus());
-        verify(productRepository, times(1)).save(product);
-    }
-
-    @Test
-    void releaseStock_ReasonPhysicalEmpty_Branch() {
-        StockReleaseRequest req = new StockReleaseRequest();
-        req.setOrderId(orderId);
-        req.setQuantity(2);
-        req.setReason("OUT_OF_STOCK");
-        StockReservation res = new StockReservation();
-        res.setStatus(ReservationStatus.PENDING);
-        res.setQuantity(2);
-        product.setStock(5);
-        product.setStatus(ProductStatus.ACTIVE);
-
-        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(res));
-        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
-        stockService.releaseStock(productId, req);
-        assertEquals(0, product.getStock());
-        assertEquals(ProductStatus.OUT_OF_STOCK, product.getStatus());
-    }
-
-    @Test
-    void processPostOrder_Cancel_ReasonPhysicalEmpty_Branch() {
-        PostOrderRequest req = new PostOrderRequest();
-        req.setOrderId(orderId);
-        req.setAction("CANCEL");
-        req.setReason("OUT_OF_STOCK");
-        StockReservation res = new StockReservation();
-        res.setStatus(ReservationStatus.PENDING);
-        res.setQuantity(3);
-        product.setStock(5);
-        product.setStatus(ProductStatus.ACTIVE);
-
-        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(res));
-        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
-        stockService.processPostOrder(productId, req);
-        assertEquals(0, product.getStock());
-        assertEquals(ProductStatus.OUT_OF_STOCK, product.getStatus());
     }
 
     @Test

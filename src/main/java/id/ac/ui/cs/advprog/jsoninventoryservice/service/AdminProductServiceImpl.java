@@ -79,7 +79,7 @@ public class AdminProductServiceImpl implements AdminProductService {
             switch (action) {
                 case HIDE -> product.setStatus(ProductStatus.HIDDEN);
                 case REMOVE -> {
-                    product.setStatus(ProductStatus.HIDDEN);
+                    product.setStatus(ProductStatus.REMOVED_BY_ADMIN);
                     product.setDeletedAt(LocalDateTime.now());
                 }
                 default -> {
