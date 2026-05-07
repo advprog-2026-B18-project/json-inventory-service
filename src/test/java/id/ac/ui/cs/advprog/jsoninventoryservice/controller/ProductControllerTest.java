@@ -355,4 +355,35 @@ class ProductControllerTest {
                         .param("order", "asc"))
                 .andExpect(MockMvcResultMatchers.status().isOk());
     }
+
+    @Test
+    void testSearchProducts_WithEmptyMode() throws Exception {
+        when(productService.searchProductsPublic(any(), any()))
+                .thenReturn(new PageImpl<>(Collections.emptyList()));
+
+        mockMvc.perform(get("/products")
+                        .param("mode", "   "))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void testSearchProducts_WithValidMode() throws Exception {
+        when(productService.searchProductsPublic(any(), any()))
+                .thenReturn(new PageImpl<>(Collections.singletonList(dummyResponse)));
+
+        mockMvc.perform(get("/products")
+                        .param("mode", "flash_sale"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void testSearchProducts_WithInvalidMode_ReturnsEmptyPage() throws Exception {
+        mockMvc.perform(get("/products")
+                        .param("mode", "INVALID_MODE_NAME"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.data").isEmpty());
+    }
 }

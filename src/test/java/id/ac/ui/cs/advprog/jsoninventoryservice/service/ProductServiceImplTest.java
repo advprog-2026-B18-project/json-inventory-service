@@ -9,6 +9,7 @@ import id.ac.ui.cs.advprog.jsoninventoryservice.exception.UnauthorizedAccessExce
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.Category;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.Product;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
+import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ShoppingMode;
 import id.ac.ui.cs.advprog.jsoninventoryservice.repository.CategoryRepository;
 import id.ac.ui.cs.advprog.jsoninventoryservice.repository.ProductRepository;
 import id.ac.ui.cs.advprog.jsoninventoryservice.repository.StockReservationRepository;
@@ -80,6 +81,7 @@ class ProductServiceImplTest {
         req.setStock(5);
         req.setOriginCountry("JP");
         req.setPurchaseDate(LocalDate.now());
+        req.setMode("LIVE");
 
         when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
         ProductResponse response = productService.createProduct(jastiperId, req);
@@ -102,6 +104,7 @@ class ProductServiceImplTest {
         req.setWeightGram(500);
         req.setImages(List.of("image.jpg"));
         req.setTags(List.of("tag1"));
+        req.setMode("LIVE");
 
         Category dummyCategory = new Category();
         dummyCategory.setCategoryId(1);
@@ -300,6 +303,7 @@ class ProductServiceImplTest {
         req.setCategoryId(999);
         req.setStock(10);
         req.setPrice(50000L);
+        req.setMode("LIVE");
 
         when(categoryRepository.findById(999)).thenReturn(Optional.empty());
         when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
@@ -435,6 +439,7 @@ class ProductServiceImplTest {
         req.setStock(5);
         req.setOriginCountry("Indonesia");
         req.setPurchaseDate(LocalDate.now());
+        req.setMode("LIVE");
 
         when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
         ProductResponse response = productService.createProduct(jastiperId, req);
@@ -892,5 +897,174 @@ class ProductServiceImplTest {
         Page<ProductResponse> response = productService.getMyCatalog(criteria, PageRequest.of(0, 10));
         assertNotNull(response);
         assertFalse(response.isEmpty());
+    }
+
+    @Test
+    void testCreateProduct_FlashSale_MissingDates_ThrowsException() {
+        ProductCreateRequest req = new ProductCreateRequest();
+        req.setName("Flash Prod");
+        req.setPrice(50L);
+        req.setStock(5);
+        req.setOriginCountry("JP");
+        req.setPurchaseDate(LocalDate.now());
+        req.setMode("FLASH_SALE");
+        req.setFlashSaleStart(null);
+        req.setFlashSaleEnd(null);
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> productService.createProduct(jastiperId, req));
+        assertEquals("Flash Sale mode must include flash_sale_start and flash_sale_end!", exception.getMessage());
+    }
+
+    @Test
+    void testCreateProduct_FlashSale_StartAfterEnd_ThrowsException() {
+        ProductCreateRequest req = new ProductCreateRequest();
+        req.setName("Flash Prod");
+        req.setPrice(50L);
+        req.setStock(5);
+        req.setOriginCountry("JP");
+        req.setPurchaseDate(LocalDate.now());
+        req.setMode("FLASH_SALE");
+        req.setFlashSaleStart(LocalDateTime.now().plusDays(2));
+        req.setFlashSaleEnd(LocalDateTime.now().plusDays(1));
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> productService.createProduct(jastiperId, req));
+        assertEquals("The Flash Sale start date cannot exceed the end date!", exception.getMessage());
+    }
+
+    @Test
+    void testUpdateBasicFields_ChangeToFlashSale_MissingDates_ThrowsException() {
+        ProductUpdateRequest req = new ProductUpdateRequest();
+        req.setMode("FLASH_SALE");
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> productService.updateProduct(jastiperId, productId, req));
+        assertEquals("Flash Sale mode must include flash_sale_start and flash_sale_end!", exception.getMessage());
+    }
+
+    @Test
+    void testUpdateBasicFields_ChangeToFlashSale_StartAfterEnd_ThrowsException() {
+        ProductUpdateRequest req = new ProductUpdateRequest();
+        req.setMode("FLASH_SALE");
+        req.setFlashSaleStart(LocalDateTime.now().plusDays(2));
+        req.setFlashSaleEnd(LocalDateTime.now().plusDays(1));
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> productService.updateProduct(jastiperId, productId, req));
+        assertEquals("The Flash Sale start date cannot exceed the end date!", exception.getMessage());
+    }
+
+    @Test
+    void testUpdateBasicFields_ChangeFromFlashSaleToLive_ShouldNullifyDates() {
+        dummyProduct.setMode(ShoppingMode.FLASH_SALE);
+        dummyProduct.setFlashSaleStart(LocalDateTime.now());
+        dummyProduct.setFlashSaleEnd(LocalDateTime.now().plusDays(1));
+
+        ProductUpdateRequest req = new ProductUpdateRequest();
+        req.setMode("LIVE");
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+        when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
+
+        productService.updateProduct(jastiperId, productId, req);
+
+        assertNull(dummyProduct.getFlashSaleStart());
+        assertNull(dummyProduct.getFlashSaleEnd());
+    }
+
+    @Test
+    void testCreateProduct_FlashSale_StartNullEndNotNull_ThrowsException() {
+        ProductCreateRequest req = new ProductCreateRequest();
+        req.setName("Flash Prod");
+        req.setPrice(50L);
+        req.setStock(5);
+        req.setOriginCountry("JP");
+        req.setMode("FLASH_SALE");
+        req.setFlashSaleStart(null);
+        req.setFlashSaleEnd(LocalDateTime.now());
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> productService.createProduct(jastiperId, req));
+        assertEquals("Flash Sale mode must include flash_sale_start and flash_sale_end!", exception.getMessage());
+    }
+
+    @Test
+    void testCreateProduct_FlashSale_StartNotNullEndNull_ThrowsException() {
+        ProductCreateRequest req = new ProductCreateRequest();
+        req.setName("Flash Prod");
+        req.setPrice(50L);
+        req.setStock(5);
+        req.setOriginCountry("JP");
+        req.setMode("FLASH_SALE");
+        req.setFlashSaleStart(LocalDateTime.now());
+        req.setFlashSaleEnd(null);
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> productService.createProduct(jastiperId, req));
+        assertEquals("Flash Sale mode must include flash_sale_start and flash_sale_end!", exception.getMessage());
+    }
+
+    @Test
+    void testCreateProduct_FlashSale_StartEqualsEnd_DoesNotThrow() {
+        ProductCreateRequest req = new ProductCreateRequest();
+        req.setName("Flash Prod");
+        req.setPrice(50L);
+        req.setStock(5);
+        req.setOriginCountry("JP");
+        req.setMode("FLASH_SALE");
+        LocalDateTime sameTime = LocalDateTime.now();
+        req.setFlashSaleStart(sameTime);
+        req.setFlashSaleEnd(sameTime);
+
+        when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
+        ProductResponse response = productService.createProduct(jastiperId, req);
+        assertNotNull(response);
+    }
+
+    @Test
+    void testUpdateBasicFields_ChangeToFlashSale_StartNullEndNotNull_ThrowsException() {
+        ProductUpdateRequest req = new ProductUpdateRequest();
+        req.setMode("FLASH_SALE");
+        req.setFlashSaleStart(null);
+        req.setFlashSaleEnd(LocalDateTime.now());
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> productService.updateProduct(jastiperId, productId, req));
+        assertEquals("Flash Sale mode must include flash_sale_start and flash_sale_end!", exception.getMessage());
+    }
+
+    @Test
+    void testUpdateBasicFields_ChangeToFlashSale_StartNotNullEndNull_ThrowsException() {
+        ProductUpdateRequest req = new ProductUpdateRequest();
+        req.setMode("FLASH_SALE");
+        req.setFlashSaleStart(LocalDateTime.now());
+        req.setFlashSaleEnd(null);
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> productService.updateProduct(jastiperId, productId, req));
+        assertEquals("Flash Sale mode must include flash_sale_start and flash_sale_end!", exception.getMessage());
+    }
+
+    @Test
+    void testUpdateBasicFields_ChangeToFlashSale_StartEqualsEnd_DoesNotThrow() {
+        ProductUpdateRequest req = new ProductUpdateRequest();
+        req.setMode("FLASH_SALE");
+        LocalDateTime sameTime = LocalDateTime.now();
+        req.setFlashSaleStart(sameTime);
+        req.setFlashSaleEnd(sameTime);
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+        when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
+
+        assertDoesNotThrow(() -> productService.updateProduct(jastiperId, productId, req));
     }
 }

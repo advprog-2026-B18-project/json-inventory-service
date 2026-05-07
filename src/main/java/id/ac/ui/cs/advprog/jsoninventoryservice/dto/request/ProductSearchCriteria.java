@@ -2,6 +2,7 @@ package id.ac.ui.cs.advprog.jsoninventoryservice.dto.request;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
+import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ShoppingMode;
 import lombok.Builder;
 import lombok.Data;
 import java.time.LocalDate;
@@ -24,4 +25,7 @@ public class ProductSearchCriteria {
     private LocalDate dateFrom;
     @JsonProperty("date_to")
     private LocalDate dateTo;
+    private ShoppingMode mode;
+    @Builder.Default
+    private boolean includeDeleted = false;
 }

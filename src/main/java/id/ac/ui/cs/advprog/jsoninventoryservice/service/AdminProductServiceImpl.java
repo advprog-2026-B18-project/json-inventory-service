@@ -54,6 +54,7 @@ public class AdminProductServiceImpl implements AdminProductService {
                 .jastiperId(jastiperId)
                 .categoryId(categoryId)
                 .status(filterStatus)
+                .includeDeleted(true)
                 .build();
         Specification<Product> spec = ProductSpecification.searchProducts(criteria);
 
