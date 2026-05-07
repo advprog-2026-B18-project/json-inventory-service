@@ -26,12 +26,11 @@ class StockRequestTest {
     void testStockReleaseRequest() {
         StockReleaseRequest r1 = new StockReleaseRequest();
         UUID id = UUID.randomUUID();
-        r1.setOrderId(id); r1.setQuantity(5);
+        r1.setOrderId(id);
         assertEquals(id, r1.getOrderId());
-        assertEquals(5, r1.getQuantity());
 
         StockReleaseRequest r2 = new StockReleaseRequest();
-        r2.setOrderId(id); r2.setQuantity(5);
+        r2.setOrderId(id);
         assertEquals(r1, r2);
         assertEquals(r1.hashCode(), r2.hashCode());
         assertNotNull(r1.toString());
