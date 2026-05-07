@@ -11,17 +11,25 @@ import java.time.LocalDateTime;
 public class FlashSaleStrategy implements ShoppingModeStrategy {
     @Override
     public boolean isEligibleForReservation(Product product, int quantity) {
-        LocalDateTime now = LocalDateTime.now();
-        if (product.getFlashSaleStart() == null || product.getFlashSaleEnd() == null) {
-            return false;
+        if (product.getStatus() != ProductStatus.ACTIVE) {
+            throw new StockOperationException("This product is currently unavailable.", 400);
         }
-        if (now.isBefore(product.getFlashSaleStart())) {
-            throw new StockOperationException("Flash sale has not started yet.", 400);
-        }
-        if (now.isAfter(product.getFlashSaleEnd())) {
-            throw new StockOperationException("Flash sale has ended.", 400);
+        if (product.getStock() < quantity) {
+            throw new StockOperationException("Insufficient stock of Flash Sale items.", 400);
         }
 
-        return product.getStatus() == ProductStatus.ACTIVE && product.getStock() >= quantity;
+        if (product.getFlashSaleStart() == null || product.getFlashSaleEnd() == null) {
+            throw new StockOperationException("Invalid Flash Sale configuration.", 400);
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        if (now.isBefore(product.getFlashSaleStart())) {
+            throw new StockOperationException("The flash sale hasn't started yet.", 400);
+        }
+        if (now.isAfter(product.getFlashSaleEnd())) {
+            throw new StockOperationException("The flash sale is over.", 400);
+        }
+
+        return true;
     }
 }
