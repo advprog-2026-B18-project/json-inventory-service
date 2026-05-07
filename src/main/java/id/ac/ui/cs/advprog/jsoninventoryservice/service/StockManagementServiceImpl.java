@@ -1,5 +1,6 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.service;
 
+import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.PostOrderRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.StockReleaseRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.StockReserveRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.ProductResponse;
@@ -10,14 +11,12 @@ import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ReservationStatus;
 import id.ac.ui.cs.advprog.jsoninventoryservice.repository.ProductRepository;
 import id.ac.ui.cs.advprog.jsoninventoryservice.repository.StockReservationRepository;
+import id.ac.ui.cs.advprog.jsoninventoryservice.strategy.ShoppingModeProvider;
+import id.ac.ui.cs.advprog.jsoninventoryservice.strategy.ShoppingModeStrategy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.scheduling.annotation.Scheduled;
-import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.PostOrderRequest;
 
-import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -27,6 +26,7 @@ import java.util.UUID;
 public class StockManagementServiceImpl implements StockManagementService {
     private final ProductRepository productRepository;
     private final StockReservationRepository reservationRepository;
+    private final ShoppingModeProvider shoppingModeProvider;
 
     private ProductResponse mapToResponseSafe(Product p) {
         if (p.getImages() != null) p.getImages().size();
@@ -50,12 +50,18 @@ public class StockManagementServiceImpl implements StockManagementService {
         }
 
         return productRepository.findByIdForUpdate(productId).map(p -> {
-            if (p.getStatus() != ProductStatus.ACTIVE || p.getStock() < req.getQuantity()) {
+            ShoppingModeStrategy strategy = shoppingModeProvider.getStrategy(p.getMode());
+
+            if (!strategy.isEligibleForReservation(p, req.getQuantity())) {
                 return null;
             }
 
             p.setStock(p.getStock() - req.getQuantity());
-            if (p.getStock() == 0) p.setStatus(ProductStatus.OUT_OF_STOCK);
+
+            if (p.getStock() == 0) {
+                p.setStatus(ProductStatus.OUT_OF_STOCK);
+            }
+
             productRepository.save(p);
 
             StockReservation res = StockReservation.builder()
