@@ -78,7 +78,8 @@ class InternalProductControllerTest {
     @Test
     void releaseStock_Success() throws Exception {
         UUID id = UUID.randomUUID();
-        StockReleaseRequest req = new StockReleaseRequest(); req.setQuantity(2); req.setOrderId(id);
+        StockReleaseRequest req = new StockReleaseRequest();
+        req.setOrderId(id);
         ProductResponse res = ProductResponse.builder().productId(id).build();
         when(stockService.releaseStock(eq(id), any())).thenReturn(Optional.of(res));
 
