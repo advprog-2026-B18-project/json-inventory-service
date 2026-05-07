@@ -241,7 +241,6 @@ class StockManagementServiceImplTest {
         product.setStock(0); product.setStatus(ProductStatus.OUT_OF_STOCK);
         StockReleaseRequest req = new StockReleaseRequest();
         req.setOrderId(orderId);
-        req.setQuantity(5);
         StockReservation reservation = new StockReservation();
         reservation.setStatus(ReservationStatus.PENDING);
         reservation.setQuantity(5);
@@ -486,7 +485,6 @@ class StockManagementServiceImplTest {
         product.setStatus(ProductStatus.OUT_OF_STOCK);
         StockReleaseRequest req = new StockReleaseRequest();
         req.setOrderId(orderId);
-        req.setQuantity(0);
 
         when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(res));
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
@@ -540,7 +538,6 @@ class StockManagementServiceImplTest {
     void releaseStock_StatusAlreadyActive_Branch() {
         StockReleaseRequest req = new StockReleaseRequest();
         req.setOrderId(orderId);
-        req.setQuantity(3);
         StockReservation res = new StockReservation();
         res.setStatus(ReservationStatus.PENDING);
         res.setQuantity(3);
@@ -602,8 +599,6 @@ class StockManagementServiceImplTest {
     void testReleaseStock_WithNullImagesAndTags_Coverage() {
         StockReleaseRequest req = new StockReleaseRequest();
         req.setOrderId(orderId);
-        req.setQuantity(2);
-
         product.setImages(null);
         product.setTags(null);
 
