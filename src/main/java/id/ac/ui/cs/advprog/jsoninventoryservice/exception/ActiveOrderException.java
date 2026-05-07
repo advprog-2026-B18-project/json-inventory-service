@@ -6,7 +6,7 @@ import lombok.Getter;
 public class ActiveOrderException extends RuntimeException {
     private final long activeOrders;
     public ActiveOrderException(long activeOrders) {
-        super("Cannot delete product. There are active orders (PENDING/CONFIRMED).");
+        super("Cannot delete product. There are active orders.");
         this.activeOrders = activeOrders;
     }
 }
