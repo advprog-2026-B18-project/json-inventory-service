@@ -10,6 +10,7 @@ import id.ac.ui.cs.advprog.jsoninventoryservice.model.Category;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.Product;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ReservationStatus;
+import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ShoppingMode;
 import id.ac.ui.cs.advprog.jsoninventoryservice.repository.CategoryRepository;
 import id.ac.ui.cs.advprog.jsoninventoryservice.repository.ProductRepository;
 import id.ac.ui.cs.advprog.jsoninventoryservice.repository.StockReservationRepository;
@@ -59,6 +60,18 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
+        if (!"FLASH_SALE".equalsIgnoreCase(req.getMode())) {
+            req.setFlashSaleStart(null);
+            req.setFlashSaleEnd(null);
+        } else {
+            if (req.getFlashSaleStart() == null || req.getFlashSaleEnd() == null) {
+                throw new IllegalArgumentException("Flash Sale mode must include flash_sale_start and flash_sale_end!");
+            }
+            if (req.getFlashSaleStart().isAfter(req.getFlashSaleEnd())) {
+                throw new IllegalArgumentException("The Flash Sale start date cannot exceed the end date!");
+            }
+        }
+
         Product product = Product.builder()
                 .jastiperId(jastiperId)
                 .categoryId(category != null ? category.getCategoryId() : null)
@@ -73,9 +86,13 @@ public class ProductServiceImpl implements ProductService {
                 .images(req.getImages() != null ? req.getImages() : new ArrayList<>())
                 .tags(req.getTags() != null ? req.getTags() : new ArrayList<>())
                 .status(req.getStock() > 0 ? ProductStatus.ACTIVE : ProductStatus.OUT_OF_STOCK)
+                .mode(ShoppingMode.valueOf(req.getMode()))
+                .flashSaleStart(req.getFlashSaleStart())
+                .flashSaleEnd(req.getFlashSaleEnd())
                 .build();
 
-        return ProductResponse.fromEntity(productRepository.save(product));
+        Product savedProduct = productRepository.save(product);
+        return enrichProductResponse(savedProduct);
     }
 
     @Override
@@ -86,8 +103,7 @@ public class ProductServiceImpl implements ProductService {
             throw new UnauthorizedAccessException("You are not authorized to delete this product.");
         }
 
-        long activeOrders = stockReservationRepository.countByProductProductIdAndStatusIn(id, List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED));
-
+        long activeOrders = stockReservationRepository.countByProductProductIdAndStatusIn(id, List.of(ReservationStatus.PENDING));
         if (activeOrders > 0) {
             throw new ActiveOrderException(activeOrders);
         }
@@ -179,6 +195,24 @@ public class ProductServiceImpl implements ProductService {
         if (req.getWeightGram() != null) existing.setWeightGram(req.getWeightGram());
         if (req.getImages() != null) existing.setImages(req.getImages());
         if (req.getTags() != null) existing.setTags(req.getTags());
+        if (req.getMode() != null) {
+            existing.setMode(ShoppingMode.valueOf(req.getMode()));
+            if (!"FLASH_SALE".equalsIgnoreCase(req.getMode())) {
+                existing.setFlashSaleStart(null);
+                existing.setFlashSaleEnd(null);
+            }
+        }
+
+        if ("FLASH_SALE".equalsIgnoreCase(String.valueOf(existing.getMode()))) {
+            if (req.getFlashSaleStart() != null) existing.setFlashSaleStart(req.getFlashSaleStart());
+            if (req.getFlashSaleEnd() != null) existing.setFlashSaleEnd(req.getFlashSaleEnd());
+            if (existing.getFlashSaleStart() == null || existing.getFlashSaleEnd() == null) {
+                throw new IllegalArgumentException("Flash Sale mode must include flash_sale_start and flash_sale_end!");
+            }
+            if (existing.getFlashSaleStart().isAfter(existing.getFlashSaleEnd())) {
+                throw new IllegalArgumentException("The Flash Sale start date cannot exceed the end date!");
+            }
+        }
     }
 
     private void updateStockAndStatus(Product existing, ProductUpdateRequest req) {
