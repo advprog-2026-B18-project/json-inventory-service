@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -40,4 +41,12 @@ public class ProductUpdateRequest {
     private String status;
     private List<String> images;
     private List<String> tags;
+
+    private String mode;
+
+    @JsonProperty("flash_sale_start")
+    private LocalDateTime flashSaleStart;
+
+    @JsonProperty("flash_sale_end")
+    private LocalDateTime flashSaleEnd;
 }
