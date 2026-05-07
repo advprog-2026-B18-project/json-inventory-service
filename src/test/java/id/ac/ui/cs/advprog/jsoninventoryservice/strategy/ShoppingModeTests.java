@@ -38,12 +38,16 @@ class ShoppingModeTests {
     @Test
     void testLiveShopping_NotEligible_StatusNotActive() {
         product.setStatus(ProductStatus.HIDDEN);
-        assertFalse(liveStrategy.isEligibleForReservation(product, 5));
+        StockOperationException ex = assertThrows(StockOperationException.class,
+                () -> liveStrategy.isEligibleForReservation(product, 5));
+        assertEquals("This product is currently unavailable.", ex.getMessage());
     }
 
     @Test
     void testLiveShopping_NotEligible_InsufficientStock() {
-        assertFalse(liveStrategy.isEligibleForReservation(product, 15));
+        StockOperationException ex = assertThrows(StockOperationException.class,
+                () -> liveStrategy.isEligibleForReservation(product, 15));
+        assertEquals("Insufficient stock.", ex.getMessage());
     }
 
     @Test
@@ -67,20 +71,26 @@ class ShoppingModeTests {
     @Test
     void testPreOrder_NotEligible_PastDate() {
         product.setPurchaseDate(LocalDate.now().minusDays(1));
-        assertFalse(preOrderStrategy.isEligibleForReservation(product, 5));
+        StockOperationException ex = assertThrows(StockOperationException.class,
+                () -> preOrderStrategy.isEligibleForReservation(product, 5));
+        assertEquals("Pre-order closed. Items are being purchased.", ex.getMessage());
     }
 
     @Test
     void testPreOrder_NotEligible_StatusNotActive() {
         product.setPurchaseDate(LocalDate.now().plusDays(5));
         product.setStatus(ProductStatus.OUT_OF_STOCK);
-        assertFalse(preOrderStrategy.isEligibleForReservation(product, 5));
+        StockOperationException ex = assertThrows(StockOperationException.class,
+                () -> preOrderStrategy.isEligibleForReservation(product, 5));
+        assertEquals("This product is currently unavailable.", ex.getMessage());
     }
 
     @Test
     void testPreOrder_NotEligible_InsufficientStock() {
         product.setPurchaseDate(LocalDate.now().plusDays(5));
-        assertFalse(preOrderStrategy.isEligibleForReservation(product, 15));
+        StockOperationException ex = assertThrows(StockOperationException.class,
+                () -> preOrderStrategy.isEligibleForReservation(product, 15));
+        assertEquals("Insufficient quota available.", ex.getMessage());
     }
 
     @Test
@@ -94,14 +104,18 @@ class ShoppingModeTests {
     void testFlashSale_NotEligible_NullStart() {
         product.setFlashSaleStart(null);
         product.setFlashSaleEnd(LocalDateTime.now().plusHours(1));
-        assertFalse(flashSaleStrategy.isEligibleForReservation(product, 5));
+        StockOperationException ex = assertThrows(StockOperationException.class,
+                () -> flashSaleStrategy.isEligibleForReservation(product, 5));
+        assertEquals("Invalid Flash Sale configuration.", ex.getMessage());
     }
 
     @Test
     void testFlashSale_NotEligible_NullEnd() {
         product.setFlashSaleStart(LocalDateTime.now().minusHours(1));
         product.setFlashSaleEnd(null);
-        assertFalse(flashSaleStrategy.isEligibleForReservation(product, 5));
+        StockOperationException ex = assertThrows(StockOperationException.class,
+                () -> flashSaleStrategy.isEligibleForReservation(product, 5));
+        assertEquals("Invalid Flash Sale configuration.", ex.getMessage());
     }
 
     @Test
@@ -111,7 +125,7 @@ class ShoppingModeTests {
 
         StockOperationException exception = assertThrows(StockOperationException.class,
                 () -> flashSaleStrategy.isEligibleForReservation(product, 5));
-        assertEquals("Flash sale has not started yet.", exception.getMessage());
+        assertEquals("The flash sale hasn't started yet.", exception.getMessage());
     }
 
     @Test
@@ -121,7 +135,7 @@ class ShoppingModeTests {
 
         StockOperationException exception = assertThrows(StockOperationException.class,
                 () -> flashSaleStrategy.isEligibleForReservation(product, 5));
-        assertEquals("Flash sale has ended.", exception.getMessage());
+        assertEquals("The flash sale is over.", exception.getMessage());
     }
 
     @Test
@@ -130,7 +144,9 @@ class ShoppingModeTests {
         product.setFlashSaleEnd(LocalDateTime.now().plusHours(1));
         product.setStatus(ProductStatus.HIDDEN);
 
-        assertFalse(flashSaleStrategy.isEligibleForReservation(product, 5));
+        StockOperationException ex = assertThrows(StockOperationException.class,
+                () -> flashSaleStrategy.isEligibleForReservation(product, 5));
+        assertEquals("This product is currently unavailable.", ex.getMessage());
     }
 
     @Test
@@ -138,7 +154,9 @@ class ShoppingModeTests {
         product.setFlashSaleStart(LocalDateTime.now().minusHours(1));
         product.setFlashSaleEnd(LocalDateTime.now().plusHours(1));
 
-        assertFalse(flashSaleStrategy.isEligibleForReservation(product, 15));
+        StockOperationException ex = assertThrows(StockOperationException.class,
+                () -> flashSaleStrategy.isEligibleForReservation(product, 15));
+        assertEquals("Insufficient stock of Flash Sale items.", ex.getMessage());
     }
 
     @Test
