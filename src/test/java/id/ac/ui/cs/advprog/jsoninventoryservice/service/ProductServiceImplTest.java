@@ -70,6 +70,8 @@ class ProductServiceImplTest {
                 .originCountry("ID")
                 .purchaseDate(LocalDate.now())
                 .status(ProductStatus.ACTIVE)
+                .images(List.of("image1.jpg"))
+                .tags(List.of("tag1"))
                 .build();
     }
 

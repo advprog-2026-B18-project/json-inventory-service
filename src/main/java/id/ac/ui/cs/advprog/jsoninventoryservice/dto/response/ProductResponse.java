@@ -72,6 +72,9 @@ public class ProductResponse {
     }
 
     public static ProductResponse fromEntity(Product p) {
+        if (p.getImages() != null) p.getImages().forEach(img -> {});
+        if (p.getTags() != null) p.getTags().forEach(tag -> {});
+
         return ProductResponse.builder()
                 .productId(p.getProductId())
                 .name(p.getName())

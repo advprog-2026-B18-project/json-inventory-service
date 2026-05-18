@@ -32,12 +32,6 @@ public class AdminProductServiceImpl implements AdminProductService {
     private final ModerationLogRepository moderationLogRepository;
     private final ApplicationEventPublisher eventPublisher;
 
-    private ProductResponse mapToResponse(Product p) {
-        if (p.getImages() != null) p.getImages().forEach(img -> {});
-        if (p.getTags() != null) p.getTags().forEach(tag -> {});
-        return ProductResponse.fromEntity(p);
-    }
-
     @Override
     public Page<ProductResponse> getAllProductsAdmin(String keyword, UUID jastiperId, String status, Integer categoryId, Pageable pageable) {
         ProductStatus filterStatus = null;
@@ -58,12 +52,12 @@ public class AdminProductServiceImpl implements AdminProductService {
                 .build();
         Specification<Product> spec = ProductSpecification.searchProducts(criteria);
 
-        return productRepository.findAll(spec, pageable).map(this::mapToResponse);
+        return productRepository.findAll(spec, pageable).map(ProductResponse::fromEntity);
     }
 
     @Override
     public Optional<ProductResponse> getAdminProductDetail(UUID id) {
-        return productRepository.findById(id).map(this::mapToResponse);
+        return productRepository.findById(id).map(ProductResponse::fromEntity);
     }
 
     @Override
@@ -98,7 +92,7 @@ public class AdminProductServiceImpl implements AdminProductService {
             moderationLogRepository.save(log);
 
             eventPublisher.publishEvent(new ProductModeratedEvent(product.getProductId(), adminId, action.name(), request.getReason(), product.getName(), product.getJastiperId()));
-            return mapToResponse(product);
+            return ProductResponse.fromEntity(product);
         });
     }
 }

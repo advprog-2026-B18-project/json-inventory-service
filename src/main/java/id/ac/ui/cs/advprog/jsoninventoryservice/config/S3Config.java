@@ -1,0 +1,35 @@
+package id.ac.ui.cs.advprog.jsoninventoryservice.config;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import software.amazon.awssdk.auth.credentials.AwsSessionCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+
+@Configuration
+public class S3Config {
+
+    @Value("${aws.s3.access-key:none}")
+    private String accessKey;
+
+    @Value("${aws.s3.secret-key:none}")
+    private String secretKey;
+
+    @Value("${aws.s3.session-token:none}")
+    private String sessionToken;
+
+    @Value("${aws.s3.region:us-east-1}")
+    private String region;
+
+    @Bean
+    public S3Client s3Client() {
+        AwsSessionCredentials credentials = AwsSessionCredentials.create(accessKey, secretKey, sessionToken);
+
+        return S3Client.builder()
+                .region(Region.of(region))
+                .credentialsProvider(StaticCredentialsProvider.create(credentials))
+                .build();
+    }
+}
