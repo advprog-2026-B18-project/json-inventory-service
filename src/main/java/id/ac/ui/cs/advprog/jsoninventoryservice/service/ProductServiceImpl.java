@@ -34,6 +34,7 @@ public class ProductServiceImpl implements ProductService {
     private final CategoryRepository categoryRepository;
     private final StockReservationRepository stockReservationRepository;
     private final AuthIntegrationService authIntegrationService;
+    private static final String FLASH_SALE_MODE = "FLASH_SALE";
 
     @Override
     public Optional<ProductResponse> getProductById(UUID id) {
@@ -60,16 +61,11 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
-        if (!"FLASH_SALE".equalsIgnoreCase(req.getMode())) {
+        if (!FLASH_SALE_MODE.equalsIgnoreCase(req.getMode())) {
             req.setFlashSaleStart(null);
             req.setFlashSaleEnd(null);
         } else {
-            if (req.getFlashSaleStart() == null || req.getFlashSaleEnd() == null) {
-                throw new IllegalArgumentException("Flash Sale mode must include flash_sale_start and flash_sale_end!");
-            }
-            if (req.getFlashSaleStart().isAfter(req.getFlashSaleEnd())) {
-                throw new IllegalArgumentException("The Flash Sale start date cannot exceed the end date!");
-            }
+            validateFlashSaleDates(req.getFlashSaleStart(), req.getFlashSaleEnd());
         }
 
         Product product = Product.builder()
@@ -122,8 +118,8 @@ public class ProductServiceImpl implements ProductService {
     }
 
     private ProductResponse mapToThumbnailResponse(Product p) {
-        if (p.getTags() != null) p.getTags().size();
-        if (p.getImages() != null) p.getImages().size();
+        if (p.getImages() != null) p.getImages().forEach(img -> {});
+        if (p.getTags() != null) p.getTags().forEach(tag -> {});
 
         ProductResponse res = ProductResponse.fromEntity(p);
         if (res.getImages() != null && !res.getImages().isEmpty()) {
@@ -133,8 +129,8 @@ public class ProductServiceImpl implements ProductService {
     }
 
     private ProductResponse enrichProductResponse(Product p) {
-        if (p.getTags() != null) p.getTags().size();
-        if (p.getImages() != null) p.getImages().size();
+        if (p.getImages() != null) p.getImages().forEach(img -> {});
+        if (p.getTags() != null) p.getTags().forEach(tag -> {});
 
         ProductResponse res = ProductResponse.fromEntity(p);
         if (p.getCategoryId() != null) {
@@ -195,23 +191,23 @@ public class ProductServiceImpl implements ProductService {
         if (req.getWeightGram() != null) existing.setWeightGram(req.getWeightGram());
         if (req.getImages() != null) existing.setImages(req.getImages());
         if (req.getTags() != null) existing.setTags(req.getTags());
+
+        updateShoppingMode(existing, req);
+    }
+
+    private void updateShoppingMode(Product existing, ProductUpdateRequest req) {
         if (req.getMode() != null) {
             existing.setMode(ShoppingMode.valueOf(req.getMode()));
-            if (!"FLASH_SALE".equalsIgnoreCase(req.getMode())) {
+            if (!FLASH_SALE_MODE.equalsIgnoreCase(req.getMode())) {
                 existing.setFlashSaleStart(null);
                 existing.setFlashSaleEnd(null);
             }
         }
 
-        if ("FLASH_SALE".equalsIgnoreCase(String.valueOf(existing.getMode()))) {
+        if (FLASH_SALE_MODE.equalsIgnoreCase(String.valueOf(existing.getMode()))) {
             if (req.getFlashSaleStart() != null) existing.setFlashSaleStart(req.getFlashSaleStart());
             if (req.getFlashSaleEnd() != null) existing.setFlashSaleEnd(req.getFlashSaleEnd());
-            if (existing.getFlashSaleStart() == null || existing.getFlashSaleEnd() == null) {
-                throw new IllegalArgumentException("Flash Sale mode must include flash_sale_start and flash_sale_end!");
-            }
-            if (existing.getFlashSaleStart().isAfter(existing.getFlashSaleEnd())) {
-                throw new IllegalArgumentException("The Flash Sale start date cannot exceed the end date!");
-            }
+            validateFlashSaleDates(existing.getFlashSaleStart(), existing.getFlashSaleEnd());
         }
     }
 
@@ -259,5 +255,14 @@ public class ProductServiceImpl implements ProductService {
     public Page<ProductResponse> getMyCatalog(ProductSearchCriteria criteria, Pageable pageable) {
         Specification<Product> spec = ProductSpecification.searchProducts(criteria);
         return productRepository.findAll(spec, pageable).map(this::mapToThumbnailResponse);
+    }
+
+    private void validateFlashSaleDates(LocalDateTime start, LocalDateTime end) {
+        if (start == null || end == null) {
+            throw new IllegalArgumentException("Flash Sale mode must include flash_sale_start and flash_sale_end!");
+        }
+        if (start.isAfter(end)) {
+            throw new IllegalArgumentException("The Flash Sale start date cannot exceed the end date!");
+        }
     }
 }

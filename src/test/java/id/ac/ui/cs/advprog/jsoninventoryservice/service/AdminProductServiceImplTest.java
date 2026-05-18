@@ -210,9 +210,8 @@ class AdminProductServiceImplTest {
 
     @Test
     void testGetAdminProductDetail_WithNullImagesAndTags_Coverage() {
-        UUID productId = UUID.randomUUID();
-        Product p = new Product();
-        p.setProductId(productId);
+        UUID localProductId = UUID.randomUUID();        Product p = new Product();
+        p.setProductId(localProductId);
         p.setJastiperId(UUID.randomUUID());
         p.setStatus(ProductStatus.ACTIVE);
         p.setPrice(150000);
@@ -220,9 +219,9 @@ class AdminProductServiceImplTest {
         p.setImages(null);
         p.setTags(null);
 
-        when(productRepository.findById(productId)).thenReturn(Optional.of(p));
+        when(productRepository.findById(localProductId)).thenReturn(Optional.of(p));
 
-        Optional<ProductResponse> response = adminService.getAdminProductDetail(productId);
+        Optional<ProductResponse> response = adminService.getAdminProductDetail(localProductId);
         assertTrue(response.isPresent());
         assertNull(response.get().getImages());
     }
