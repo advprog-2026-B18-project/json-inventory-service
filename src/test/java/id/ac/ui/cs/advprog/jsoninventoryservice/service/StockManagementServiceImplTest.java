@@ -23,6 +23,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -61,6 +62,8 @@ class StockManagementServiceImplTest {
         product.setAvgRating(0.0f);
         product.setTotalOrders(0);
         product.setTotalReviews(0);
+        product.setImages(List.of("image1.jpg"));
+        product.setTags(List.of("tag1"));
     }
 
     private void setupShoppingModeMock(boolean isEligible) {

@@ -65,6 +65,8 @@ class AdminProductServiceImplTest {
         product.setStatus(ProductStatus.ACTIVE);
         product.setPrice(150000);
         product.setStock(10);
+        product.setImages(List.of("image1.jpg"));
+        product.setTags(List.of("tag1"));
 
         when(root.get(anyString())).thenReturn(path);
         when(path.get(anyString())).thenReturn(path);
