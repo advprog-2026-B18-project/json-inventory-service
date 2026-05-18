@@ -33,8 +33,8 @@ public class AdminProductServiceImpl implements AdminProductService {
     private final ApplicationEventPublisher eventPublisher;
 
     private ProductResponse mapToResponse(Product p) {
-        if (p.getImages() != null) p.getImages().size();
-        if (p.getTags() != null) p.getTags().size();
+        if (p.getImages() != null) p.getImages().forEach(img -> {});
+        if (p.getTags() != null) p.getTags().forEach(tag -> {});
         return ProductResponse.fromEntity(p);
     }
 

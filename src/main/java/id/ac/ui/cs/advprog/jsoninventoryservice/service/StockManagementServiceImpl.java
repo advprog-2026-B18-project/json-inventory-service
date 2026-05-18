@@ -29,8 +29,8 @@ public class StockManagementServiceImpl implements StockManagementService {
     private final ShoppingModeProvider shoppingModeProvider;
 
     private ProductResponse mapToResponseSafe(Product p) {
-        if (p.getImages() != null) p.getImages().size();
-        if (p.getTags() != null) p.getTags().size();
+        if (p.getImages() != null) p.getImages().forEach(img -> {});
+        if (p.getTags() != null) p.getTags().forEach(tag -> {});
         return ProductResponse.fromEntity(p);
     }
 
@@ -116,7 +116,7 @@ public class StockManagementServiceImpl implements StockManagementService {
         if ("CONFIRM".equalsIgnoreCase(request.getAction())) {
             handleConfirmAction(product, request, optRes);
         } else if ("CANCEL".equalsIgnoreCase(request.getAction())) {
-            handleCancelAction(product, request, optRes);
+            handleCancelAction(product, optRes);
         } else {
             throw new IllegalArgumentException("Invalid action. Must be 'CONFIRM' or 'CANCEL'.");
         }
@@ -143,10 +143,9 @@ public class StockManagementServiceImpl implements StockManagementService {
         }
     }
 
-    private void handleCancelAction(Product product, PostOrderRequest request, Optional<StockReservation> optRes) {
+    private void handleCancelAction(Product product, Optional<StockReservation> optRes) {
         if (optRes.isPresent() && optRes.get().getStatus() != ReservationStatus.RELEASED) {
             StockReservation res = optRes.get();
-
             product.setStock(product.getStock() + res.getQuantity());
             if (product.getStatus() == ProductStatus.OUT_OF_STOCK && product.getStock() > 0) {
                 product.setStatus(ProductStatus.ACTIVE);
