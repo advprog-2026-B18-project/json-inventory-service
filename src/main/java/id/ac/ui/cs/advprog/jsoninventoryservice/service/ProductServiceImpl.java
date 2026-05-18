@@ -118,9 +118,6 @@ public class ProductServiceImpl implements ProductService {
     }
 
     private ProductResponse mapToThumbnailResponse(Product p) {
-        if (p.getImages() != null) p.getImages().forEach(img -> {});
-        if (p.getTags() != null) p.getTags().forEach(tag -> {});
-
         ProductResponse res = ProductResponse.fromEntity(p);
         if (res.getImages() != null && !res.getImages().isEmpty()) {
             res.setImages(List.of(res.getImages().getFirst()));
@@ -129,9 +126,6 @@ public class ProductServiceImpl implements ProductService {
     }
 
     private ProductResponse enrichProductResponse(Product p) {
-        if (p.getImages() != null) p.getImages().forEach(img -> {});
-        if (p.getTags() != null) p.getTags().forEach(tag -> {});
-
         ProductResponse res = ProductResponse.fromEntity(p);
         if (p.getCategoryId() != null) {
             categoryRepository.findById(p.getCategoryId()).ifPresent(cat -> {
@@ -175,8 +169,6 @@ public class ProductServiceImpl implements ProductService {
             updateCategory(existing, req);
 
             Product savedProduct = productRepository.save(existing);
-            if (savedProduct.getImages() != null) savedProduct.getImages().size();
-            if (savedProduct.getTags() != null) savedProduct.getTags().size();
             return ProductResponse.fromEntity(savedProduct);
         });
     }

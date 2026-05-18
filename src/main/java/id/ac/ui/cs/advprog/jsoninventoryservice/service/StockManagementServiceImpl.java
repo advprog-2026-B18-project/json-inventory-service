@@ -28,12 +28,6 @@ public class StockManagementServiceImpl implements StockManagementService {
     private final StockReservationRepository reservationRepository;
     private final ShoppingModeProvider shoppingModeProvider;
 
-    private ProductResponse mapToResponseSafe(Product p) {
-        if (p.getImages() != null) p.getImages().forEach(img -> {});
-        if (p.getTags() != null) p.getTags().forEach(tag -> {});
-        return ProductResponse.fromEntity(p);
-    }
-
     @Override
     @Transactional
     public Optional<StockOperationResponse> reserveStock(UUID productId, StockReserveRequest req) {
@@ -100,7 +94,7 @@ public class StockManagementServiceImpl implements StockManagementService {
             res.setStatus(ReservationStatus.RELEASED);
             reservationRepository.save(res);
 
-            return Optional.of(mapToResponseSafe(p));
+            return Optional.of(ProductResponse.fromEntity(p));
         }
         return Optional.empty();
     }
@@ -122,7 +116,7 @@ public class StockManagementServiceImpl implements StockManagementService {
         }
         productRepository.save(product);
 
-        return Optional.of(mapToResponseSafe(product));
+        return Optional.of(ProductResponse.fromEntity(product));
     }
 
     private void handleConfirmAction(Product product, PostOrderRequest request, Optional<StockReservation> optRes) {
