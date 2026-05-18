@@ -9,6 +9,8 @@ import id.ac.ui.cs.advprog.jsoninventoryservice.service.ProductService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -320,39 +322,20 @@ class ProductControllerTest {
                 .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(true));
     }
 
-    @Test
-    void testSearchProducts_SortByPurchaseDate_Asc() throws Exception {
+    @ParameterizedTest
+    @CsvSource({
+            "purchase_date, asc",
+            "rating, desc",
+            "price, asc"
+    })
+    void testSearchProducts_SortingParameterized(String sortBy, String order) throws Exception {
         when(productService.searchProductsPublic(any(), any()))
                 .thenReturn(new PageImpl<>(Collections.emptyList()));
 
         mockMvc.perform(MockMvcRequestBuilders.get("/products")
-                        .param("sort_by", "purchase_date")
-                        .param("sortBy", "purchase_date")
-                        .param("order", "asc"))
-                .andExpect(MockMvcResultMatchers.status().isOk());
-    }
-
-    @Test
-    void testSearchProducts_SortByRating_Desc() throws Exception {
-        when(productService.searchProductsPublic(any(), any()))
-                .thenReturn(new PageImpl<>(Collections.emptyList()));
-
-        mockMvc.perform(MockMvcRequestBuilders.get("/products")
-                        .param("sort_by", "rating")
-                        .param("sortBy", "rating")
-                        .param("order", "desc"))
-                .andExpect(MockMvcResultMatchers.status().isOk());
-    }
-
-    @Test
-    void testSearchProducts_SortByOther_Asc() throws Exception {
-        when(productService.searchProductsPublic(any(), any()))
-                .thenReturn(new PageImpl<>(Collections.emptyList()));
-
-        mockMvc.perform(MockMvcRequestBuilders.get("/products")
-                        .param("sort_by", "price")
-                        .param("sortBy", "price")
-                        .param("order", "asc"))
+                        .param("sort_by", sortBy)
+                        .param("sortBy", sortBy)
+                        .param("order", order))
                 .andExpect(MockMvcResultMatchers.status().isOk());
     }
 

@@ -16,6 +16,8 @@ import id.ac.ui.cs.advprog.jsoninventoryservice.strategy.ShoppingModeStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -376,18 +378,6 @@ class StockManagementServiceImplTest {
     }
 
     @Test
-    void processPostOrder_Confirm_RatingOutOfBounds() {
-        PostOrderRequest req = new PostOrderRequest();
-        req.setOrderId(orderId);
-        req.setAction("CONFIRM");
-        req.setRating(6.0);
-
-        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
-        stockService.processPostOrder(productId, req);
-        assertEquals(0.0f, product.getAvgRating());
-    }
-
-    @Test
     void processPostOrder_Confirm_NullReviewsAndRating() {
         product.setTotalReviews(null);
         product.setAvgRating(null);
@@ -494,23 +484,14 @@ class StockManagementServiceImplTest {
         assertEquals(ProductStatus.OUT_OF_STOCK, product.getStatus());
     }
 
-    @Test
-    void processPostOrder_Confirm_RatingTooLow_Branch() {
+    @ParameterizedTest
+    @ValueSource(doubles = {6.0, 0.5, 5.5})
+    void processPostOrder_Confirm_RatingOutOfBounds_Parameterized(Double invalidRating) {
         PostOrderRequest req = new PostOrderRequest();
         req.setOrderId(orderId);
         req.setAction("CONFIRM");
-        req.setRating(0.5);
-        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
-        stockService.processPostOrder(productId, req);
-        assertEquals(0.0f, product.getAvgRating());
-    }
+        req.setRating(invalidRating);
 
-    @Test
-    void processPostOrder_Confirm_RatingTooHigh_Branch() {
-        PostOrderRequest req = new PostOrderRequest();
-        req.setOrderId(orderId);
-        req.setAction("CONFIRM");
-        req.setRating(5.5);
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
         stockService.processPostOrder(productId, req);
         assertEquals(0.0f, product.getAvgRating());
