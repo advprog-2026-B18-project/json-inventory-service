@@ -41,6 +41,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("io.jsonwebtoken:jjwt-api:$jjwtVersion")
+    implementation("software.amazon.awssdk:s3:2.25.11")
 
     // Compile Only & Annotation Processors
     compileOnly("org.projectlombok:lombok")
