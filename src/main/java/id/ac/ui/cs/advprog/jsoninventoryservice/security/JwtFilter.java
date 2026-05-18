@@ -25,7 +25,6 @@ public class JwtFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
-
         String path = request.getRequestURI();
         if (path.startsWith("/internal/")) {
             filterChain.doFilter(request, response);
@@ -33,38 +32,39 @@ public class JwtFilter extends OncePerRequestFilter {
         }
 
         String header = request.getHeader("Authorization");
-        String token = null;
-
         if (header != null && header.startsWith("Bearer ")) {
-            token = header.substring(7);
+            String token = header.substring(7);
+            processToken(token, request);
         }
 
-        if (token != null) {
-            try {
-                if (jwtUtil.validateToken(token)) {
-                    String accountId = jwtUtil.getAccountIdFromToken(token);
-                    String role = jwtUtil.getRoleFromToken(token);
+        filterChain.doFilter(request, response);
+    }
 
-                    if (accountId != null) {
-                        UUID uuidAccountId = UUID.fromString(accountId);
-                        request.setAttribute("userRole", role);
-                        if ("ADMIN".equals(role)) {
-                            request.setAttribute("adminId", uuidAccountId);
-                        } else {
-                            request.setAttribute("jastiperId", uuidAccountId);
-                        }
+    private void processToken(String token, HttpServletRequest request) {
+        try {
+            if (jwtUtil.validateToken(token)) {
+                String accountId = jwtUtil.getAccountIdFromToken(token);
+                String role = jwtUtil.getRoleFromToken(token);
 
-                        if (role != null) {
-                            String authorityRole = role.startsWith("ROLE_") ? role : "ROLE_" + role;
-                            List<SimpleGrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority(authorityRole));
-                            UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(accountId, null, authorities);
-                            SecurityContextHolder.getContext().setAuthentication(auth);
-                        }
+                if (accountId != null) {
+                    UUID uuidAccountId = UUID.fromString(accountId);
+                    request.setAttribute("userRole", role);
+                    if ("ADMIN".equals(role)) {
+                        request.setAttribute("adminId", uuidAccountId);
+                    } else {
+                        request.setAttribute("jastiperId", uuidAccountId);
+                    }
+
+                    if (role != null) {
+                        String authorityRole = role.startsWith("ROLE_") ? role : "ROLE_" + role;
+                        List<SimpleGrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority(authorityRole));
+                        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(accountId, null, authorities);
+                        SecurityContextHolder.getContext().setAuthentication(auth);
                     }
                 }
-            } catch (Exception ignored) {
             }
+        } catch (Exception ignored) {
+            // Token is invalid
         }
-        filterChain.doFilter(request, response);
     }
 }
