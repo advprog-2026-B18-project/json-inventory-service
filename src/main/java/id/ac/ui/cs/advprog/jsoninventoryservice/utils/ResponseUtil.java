@@ -4,6 +4,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 public class ResponseUtil {
+    private ResponseUtil() {
+        // Prevent instantiation
+    }
+
     public static <T> ResponseEntity<ApiResponse<T>> success(T data, String message) {
         return ResponseEntity.ok(new ApiResponse<>(true, message, data));
     }

@@ -86,7 +86,7 @@ public class GlobalExceptionHandler {
     private Map<String, Object> buildBaseError(String message) {
         Map<String, Object> response = new HashMap<>();
         response.put("success", false);
-        response.put("message", message);
+        response.put(MESSAGE_KEY, message);
         return response;
     }
 }
