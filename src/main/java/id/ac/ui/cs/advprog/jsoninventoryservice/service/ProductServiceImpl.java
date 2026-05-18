@@ -191,6 +191,11 @@ public class ProductServiceImpl implements ProductService {
         if (req.getWeightGram() != null) existing.setWeightGram(req.getWeightGram());
         if (req.getImages() != null) existing.setImages(req.getImages());
         if (req.getTags() != null) existing.setTags(req.getTags());
+
+        updateShoppingMode(existing, req);
+    }
+
+    private void updateShoppingMode(Product existing, ProductUpdateRequest req) {
         if (req.getMode() != null) {
             existing.setMode(ShoppingMode.valueOf(req.getMode()));
             if (!FLASH_SALE_MODE.equalsIgnoreCase(req.getMode())) {
