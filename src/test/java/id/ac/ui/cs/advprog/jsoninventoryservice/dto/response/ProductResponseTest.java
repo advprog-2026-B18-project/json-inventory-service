@@ -2,6 +2,7 @@ package id.ac.ui.cs.advprog.jsoninventoryservice.dto.response;
 
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.Product;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
+import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ShoppingMode;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -102,5 +103,29 @@ class ProductResponseTest {
         assertNull(res.getStatus());
         assertNull(res.getServiceFee());
         assertEquals(0, res.getStats().getTotalReviews());
+    }
+
+    @Test
+    void testFromEntity_WithModeNotNull_Branch() {
+        Product product = new Product();
+        product.setProductId(UUID.randomUUID());
+        product.setPrice(100);
+        product.setStock(10);
+        product.setMode(ShoppingMode.FLASH_SALE);
+
+        ProductResponse res = ProductResponse.fromEntity(product);
+        assertEquals("FLASH_SALE", res.getMode());
+    }
+
+    @Test
+    void testFromEntity_WithModeNull_Branch() {
+        Product product = new Product();
+        product.setProductId(UUID.randomUUID());
+        product.setPrice(100);
+        product.setStock(10);
+        product.setMode(null);
+
+        ProductResponse res = ProductResponse.fromEntity(product);
+        assertEquals("LIVE", res.getMode());
     }
 }

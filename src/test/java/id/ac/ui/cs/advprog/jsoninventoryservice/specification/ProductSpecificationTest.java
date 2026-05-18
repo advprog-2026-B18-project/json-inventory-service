@@ -3,6 +3,7 @@ package id.ac.ui.cs.advprog.jsoninventoryservice.specification;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductSearchCriteria;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.Product;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
+import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ShoppingMode; // <--- Import baru
 import jakarta.persistence.criteria.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.jpa.domain.Specification;
@@ -38,6 +39,8 @@ class ProductSpecificationTest {
                 .status(ProductStatus.ACTIVE)
                 .categoryId(1)
                 .jastiperId(UUID.randomUUID())
+                .mode(ShoppingMode.LIVE)
+                .includeDeleted(true)
                 .build();
 
         Specification<Product> spec = ProductSpecification.searchProducts(criteria);
@@ -75,6 +78,8 @@ class ProductSpecificationTest {
                 .status(null)
                 .categoryId(null)
                 .jastiperId(null)
+                .mode(null)
+                .includeDeleted(false)
                 .build();
 
         Specification<Product> spec = ProductSpecification.searchProducts(criteria);

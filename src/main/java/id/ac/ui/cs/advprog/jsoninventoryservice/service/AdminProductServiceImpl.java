@@ -54,6 +54,7 @@ public class AdminProductServiceImpl implements AdminProductService {
                 .jastiperId(jastiperId)
                 .categoryId(categoryId)
                 .status(filterStatus)
+                .includeDeleted(true)
                 .build();
         Specification<Product> spec = ProductSpecification.searchProducts(criteria);
 
@@ -79,7 +80,7 @@ public class AdminProductServiceImpl implements AdminProductService {
             switch (action) {
                 case HIDE -> product.setStatus(ProductStatus.HIDDEN);
                 case REMOVE -> {
-                    product.setStatus(ProductStatus.HIDDEN);
+                    product.setStatus(ProductStatus.REMOVED_BY_ADMIN);
                     product.setDeletedAt(LocalDateTime.now());
                 }
                 default -> {

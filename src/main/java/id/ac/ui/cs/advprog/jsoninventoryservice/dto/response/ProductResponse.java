@@ -1,8 +1,10 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.Product;
 import lombok.*;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -11,20 +13,30 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ProductResponse {
+    @JsonProperty("product_id")
     private UUID productId;
     private String name;
     private String description;
     private long price;
     private int stock;
     private String status;
+    @JsonProperty("origin_country")
     private String originCountry;
+    @JsonProperty("purchase_date")
     private LocalDate purchaseDate;
+    @JsonProperty("weight_gram")
     private Integer weightGram;
+    @JsonProperty("service_fee")
     private Long serviceFee;
     private List<String> images;
     private List<String> tags;
     private CategoryInfo category;
     private JastiperInfo jastiper;
+    private String mode;
+    @JsonProperty("flash_sale_start")
+    private LocalDateTime flashSaleStart;
+    @JsonProperty("flash_sale_end")
+    private LocalDateTime flashSaleEnd;
     private ProductStats stats;
 
     @Data
@@ -73,6 +85,9 @@ public class ProductResponse {
                 .serviceFee(p.getServiceFee() != null ? p.getServiceFee().longValue() : null)
                 .images(p.getImages())
                 .tags(p.getTags())
+                .mode(p.getMode() != null ? p.getMode().name() : "LIVE")
+                .flashSaleStart(p.getFlashSaleStart())
+                .flashSaleEnd(p.getFlashSaleEnd())
                 .stats(ProductStats.builder()
                         .totalOrders(p.getTotalOrders() != null ? p.getTotalOrders() : 0)
                         .totalReviews(p.getTotalReviews() != null ? p.getTotalReviews() : 0)

@@ -22,7 +22,9 @@ public final class ProductSpecification {
             addRangeMatches(predicates, cb, root, criteria);
             addTextMatches(predicates, cb, root, criteria);
 
-            predicates.add(cb.isNull(root.get("deletedAt")));
+            if (!criteria.isIncludeDeleted()) {
+                predicates.add(cb.isNull(root.get("deletedAt")));
+            }
             return cb.and(predicates.toArray(new Predicate[0]));
         };
     }
@@ -31,6 +33,7 @@ public final class ProductSpecification {
         if (criteria.getStatus() != null) predicates.add(cb.equal(root.get("status"), criteria.getStatus()));
         if (criteria.getJastiperId() != null) predicates.add(cb.equal(root.get("jastiperId"), criteria.getJastiperId()));
         if (criteria.getCategoryId() != null) predicates.add(cb.equal(root.get("categoryId"), criteria.getCategoryId()));
+        if (criteria.getMode() != null) predicates.add(cb.equal(root.get("mode"), criteria.getMode()));
     }
 
     private static void addRangeMatches(List<Predicate> predicates, CriteriaBuilder cb, Root<Product> root, ProductSearchCriteria criteria) {

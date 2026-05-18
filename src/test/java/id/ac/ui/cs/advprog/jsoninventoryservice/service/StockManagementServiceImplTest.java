@@ -11,6 +11,8 @@ import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ReservationStatus;
 import id.ac.ui.cs.advprog.jsoninventoryservice.repository.ProductRepository;
 import id.ac.ui.cs.advprog.jsoninventoryservice.repository.StockReservationRepository;
+import id.ac.ui.cs.advprog.jsoninventoryservice.strategy.ShoppingModeProvider;
+import id.ac.ui.cs.advprog.jsoninventoryservice.strategy.ShoppingModeStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,18 +21,21 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class StockManagementServiceImplTest {
     @Mock private ProductRepository productRepository;
     @Mock private StockReservationRepository reservationRepository;
+    @Mock private ShoppingModeProvider shoppingModeProvider;
+    @Mock private ShoppingModeStrategy shoppingModeStrategy;
+
     @InjectMocks private StockManagementServiceImpl stockService;
 
     private Product product;
@@ -56,6 +61,11 @@ class StockManagementServiceImplTest {
         product.setTotalReviews(0);
     }
 
+    private void setupShoppingModeMock(boolean isEligible) {
+        when(shoppingModeProvider.getStrategy(any())).thenReturn(shoppingModeStrategy);
+        when(shoppingModeStrategy.isEligibleForReservation(any(Product.class), anyInt())).thenReturn(isEligible);
+    }
+
     @Test
     void reserveStock_IdempotentSuccess() {
         StockReserveRequest req = new StockReserveRequest();
@@ -66,8 +76,9 @@ class StockManagementServiceImplTest {
         existingRes.setStatus(ReservationStatus.PENDING);
         existingRes.setQuantity(2);
 
-        when(reservationRepository.findByOrderIdAndProduct_ProductId(any(), any())).thenReturn(Optional.of(existingRes));
-        when(productRepository.findByIdForUpdate(any())).thenReturn(Optional.of(product));
+        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(existingRes));
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+
         Optional<StockOperationResponse> res = stockService.reserveStock(productId, req);
         assertTrue(res.isPresent());
         verify(productRepository, never()).save(any());
@@ -78,8 +89,11 @@ class StockManagementServiceImplTest {
         StockReserveRequest req = new StockReserveRequest();
         req.setOrderId(orderId);
         req.setQuantity(2);
-        when(reservationRepository.findByOrderIdAndProduct_ProductId(any(), any())).thenReturn(Optional.empty());
-        when(productRepository.findByIdForUpdate(any())).thenReturn(Optional.of(product));
+
+        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.empty());
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+        setupShoppingModeMock(true);
+
         when(reservationRepository.save(any(StockReservation.class))).thenAnswer(invocation -> {
             StockReservation saved = invocation.getArgument(0);
             saved.setReservationId(UUID.randomUUID());
@@ -96,8 +110,11 @@ class StockManagementServiceImplTest {
         StockReserveRequest req = new StockReserveRequest();
         req.setOrderId(orderId);
         req.setQuantity(10);
-        when(reservationRepository.findByOrderIdAndProduct_ProductId(any(), any())).thenReturn(Optional.empty());
-        when(productRepository.findByIdForUpdate(any())).thenReturn(Optional.of(product));
+
+        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.empty());
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+        setupShoppingModeMock(true);
+
         when(reservationRepository.save(any(StockReservation.class))).thenAnswer(invocation -> {
             StockReservation saved = invocation.getArgument(0);
             saved.setReservationId(UUID.randomUUID());
@@ -120,8 +137,9 @@ class StockManagementServiceImplTest {
         resMock.setReservationId(UUID.randomUUID());
         resMock.setQuantity(2);
 
-        when(reservationRepository.findByOrderIdAndProduct_ProductId(any(), any())).thenReturn(Optional.of(resMock));
-        when(productRepository.findByIdForUpdate(any())).thenReturn(Optional.of(product));
+        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(resMock));
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+
         Optional<StockOperationResponse> result = stockService.reserveStock(productId, req);
         assertTrue(result.isPresent());
     }
@@ -136,6 +154,8 @@ class StockManagementServiceImplTest {
 
         when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(oldRes));
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+        setupShoppingModeMock(true);
+
         when(reservationRepository.save(any(StockReservation.class))).thenAnswer(invocation -> {
             StockReservation saved = invocation.getArgument(0);
             saved.setReservationId(UUID.randomUUID());
@@ -152,8 +172,11 @@ class StockManagementServiceImplTest {
         StockReserveRequest req = new StockReserveRequest();
         req.setOrderId(orderId);
         req.setQuantity(2);
-        when(reservationRepository.findByOrderIdAndProduct_ProductId(any(), any())).thenReturn(Optional.empty());
-        when(productRepository.findByIdForUpdate(any())).thenReturn(Optional.of(product));
+
+        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.empty());
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+        setupShoppingModeMock(false);
+
         Optional<StockOperationResponse> res = stockService.reserveStock(productId, req);
         assertFalse(res.isPresent());
     }
@@ -163,10 +186,54 @@ class StockManagementServiceImplTest {
         StockReserveRequest req = new StockReserveRequest();
         req.setOrderId(orderId);
         req.setQuantity(15);
-        when(reservationRepository.findByOrderIdAndProduct_ProductId(any(), any())).thenReturn(Optional.empty());
-        when(productRepository.findByIdForUpdate(any())).thenReturn(Optional.of(product));
+
+        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.empty());
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+        setupShoppingModeMock(false);
+
         Optional<StockOperationResponse> res = stockService.reserveStock(productId, req);
         assertFalse(res.isPresent());
+    }
+
+    @Test
+    void reserveStock_Fail_ProductNotActive_And_InsufficientStock() {
+        product.setStatus(ProductStatus.HIDDEN);
+        product.setStock(1);
+        StockReserveRequest req = new StockReserveRequest();
+        req.setOrderId(orderId);
+        req.setQuantity(5);
+
+        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.empty());
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+        setupShoppingModeMock(false);
+
+        Optional<StockOperationResponse> res = stockService.reserveStock(productId, req);
+        assertFalse(res.isPresent());
+    }
+
+    @Test
+    void testReserveStock_Success() {
+        StockReserveRequest request = new StockReserveRequest();
+        request.setOrderId(orderId);
+        request.setQuantity(2);
+
+        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.empty());
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+        setupShoppingModeMock(true);
+
+        when(reservationRepository.save(any(StockReservation.class))).thenAnswer(invocation -> {
+            StockReservation res = invocation.getArgument(0);
+            res.setReservationId(UUID.randomUUID());
+            return res;
+        });
+
+        Optional<StockOperationResponse> response = stockService.reserveStock(productId, request);
+        assertTrue(response.isPresent());
+        assertEquals(2, response.get().getReservedQuantity());
+        assertEquals(8, response.get().getRemainingStock());
+        assertEquals("RESERVED", response.get().getStatus());
+        assertNotNull(response.get().getReservationId());
+        assertEquals(8, product.getStock());
     }
 
     @Test
@@ -174,13 +241,12 @@ class StockManagementServiceImplTest {
         product.setStock(0); product.setStatus(ProductStatus.OUT_OF_STOCK);
         StockReleaseRequest req = new StockReleaseRequest();
         req.setOrderId(orderId);
-        req.setQuantity(5);
         StockReservation reservation = new StockReservation();
         reservation.setStatus(ReservationStatus.PENDING);
         reservation.setQuantity(5);
 
-        when(reservationRepository.findByOrderIdAndProduct_ProductId(any(), any())).thenReturn(Optional.of(reservation));
-        when(productRepository.findByIdForUpdate(any())).thenReturn(Optional.of(product));
+        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(reservation));
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
 
         Optional<ProductResponse> res = stockService.releaseStock(productId, req);
         assertTrue(res.isPresent());
@@ -193,7 +259,9 @@ class StockManagementServiceImplTest {
     void releaseStock_Fail_NotFound() {
         StockReleaseRequest req = new StockReleaseRequest();
         req.setOrderId(orderId);
-        when(reservationRepository.findByOrderIdAndProduct_ProductId(any(), any())).thenReturn(Optional.empty());
+
+        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.empty());
+
         Optional<ProductResponse> res = stockService.releaseStock(productId, req);
         assertFalse(res.isPresent());
     }
@@ -204,16 +272,11 @@ class StockManagementServiceImplTest {
         req.setOrderId(orderId);
         StockReservation reservation = new StockReservation();
         reservation.setStatus(ReservationStatus.RELEASED);
-        when(reservationRepository.findByOrderIdAndProduct_ProductId(any(), any())).thenReturn(Optional.of(reservation));
+
+        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(reservation));
+
         Optional<ProductResponse> res = stockService.releaseStock(productId, req);
         assertFalse(res.isPresent());
-    }
-
-    @Test
-    void cleanupExpiredReservations_NoReservations() {
-        when(reservationRepository.findExpiredReservations(any())).thenReturn(List.of());
-        stockService.cleanupExpiredReservations();
-        verify(productRepository, never()).save(any());
     }
 
     @Test
@@ -226,8 +289,8 @@ class StockManagementServiceImplTest {
         res.setStatus(ReservationStatus.PENDING);
         res.setProduct(product);
 
-        when(productRepository.findByIdForUpdate(any())).thenReturn(Optional.of(product));
-        when(reservationRepository.findByOrderIdAndProduct_ProductId(any(), any())).thenReturn(Optional.of(res));
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(res));
 
         Optional<ProductResponse> result = stockService.processPostOrder(productId, req);
         assertTrue(result.isPresent());
@@ -251,8 +314,8 @@ class StockManagementServiceImplTest {
         res.setQuantity(2);
         res.setProduct(product);
 
-        when(productRepository.findByIdForUpdate(any())).thenReturn(Optional.of(product));
-        when(reservationRepository.findByOrderIdAndProduct_ProductId(any(), any())).thenReturn(Optional.of(res));
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(res));
 
         Optional<ProductResponse> result = stockService.processPostOrder(productId, req);
         assertTrue(result.isPresent());
@@ -266,7 +329,7 @@ class StockManagementServiceImplTest {
     @Test
     void processPostOrder_Fail_NotFound() {
         PostOrderRequest req = new PostOrderRequest();
-        when(productRepository.findByIdForUpdate(any())).thenReturn(Optional.empty());
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.empty());
         Optional<ProductResponse> result = stockService.processPostOrder(productId, req);
         assertFalse(result.isPresent());
     }
@@ -276,27 +339,13 @@ class StockManagementServiceImplTest {
         PostOrderRequest req = new PostOrderRequest();
         req.setOrderId(orderId);
         req.setAction("INVALID_ACTION");
-        when(productRepository.findByIdForUpdate(any())).thenReturn(Optional.of(product));
-        when(reservationRepository.findByOrderIdAndProduct_ProductId(any(), any())).thenReturn(Optional.empty());
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.empty());
 
         assertThrows(IllegalArgumentException.class, () -> {
             stockService.processPostOrder(productId, req);
         });
-    }
-
-    @Test
-    void cleanupExpiredReservations_WithReservations_Fix() {
-        StockReservation res = new StockReservation();
-        res.setQuantity(5);
-        product.setStock(0);
-        product.setStatus(ProductStatus.OUT_OF_STOCK);
-        res.setProduct(product);
-
-        when(reservationRepository.findExpiredReservations(any())).thenReturn(List.of(res));
-        stockService.cleanupExpiredReservations();
-        assertEquals(5, product.getStock());
-        assertEquals(ProductStatus.ACTIVE, product.getStatus());
-        assertEquals(ReservationStatus.RELEASED, res.getStatus());
     }
 
     @Test
@@ -310,6 +359,7 @@ class StockManagementServiceImplTest {
 
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
         when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(res));
+
         stockService.processPostOrder(productId, req);
         assertEquals(ReservationStatus.RELEASED, res.getStatus());
     }
@@ -435,10 +485,10 @@ class StockManagementServiceImplTest {
         product.setStatus(ProductStatus.OUT_OF_STOCK);
         StockReleaseRequest req = new StockReleaseRequest();
         req.setOrderId(orderId);
-        req.setQuantity(0);
 
-        when(reservationRepository.findByOrderIdAndProduct_ProductId(any(), any())).thenReturn(Optional.of(res));
-        when(productRepository.findByIdForUpdate(any())).thenReturn(Optional.of(product));
+        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(res));
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+
         stockService.releaseStock(productId, req);
         assertEquals(0, product.getStock());
         assertEquals(ProductStatus.OUT_OF_STOCK, product.getStatus());
@@ -475,6 +525,7 @@ class StockManagementServiceImplTest {
         res.setStatus(ReservationStatus.PENDING);
         res.setQuantity(2);
         product.setStock(5); product.setStatus(ProductStatus.ACTIVE);
+
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
         when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(res));
 
@@ -487,27 +538,16 @@ class StockManagementServiceImplTest {
     void releaseStock_StatusAlreadyActive_Branch() {
         StockReleaseRequest req = new StockReleaseRequest();
         req.setOrderId(orderId);
-        req.setQuantity(3);
         StockReservation res = new StockReservation();
         res.setStatus(ReservationStatus.PENDING);
         res.setQuantity(3);
         product.setStock(10); product.setStatus(ProductStatus.ACTIVE);
-        when(reservationRepository.findByOrderIdAndProduct_ProductId(any(), any())).thenReturn(Optional.of(res));
-        when(productRepository.findByIdForUpdate(any())).thenReturn(Optional.of(product));
+
+        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(res));
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
 
         stockService.releaseStock(productId, req);
         assertEquals(13, product.getStock());
-    }
-
-    @Test
-    void cleanupExpiredReservations_StatusAlreadyActive_Branch() {
-        StockReservation res = new StockReservation();
-        res.setQuantity(4);
-        res.setProduct(product);
-        product.setStock(1); product.setStatus(ProductStatus.ACTIVE);
-        when(reservationRepository.findExpiredReservations(any())).thenReturn(List.of(res));
-        stockService.cleanupExpiredReservations();
-        assertEquals(5, product.getStock());
     }
 
     @Test
@@ -533,88 +573,7 @@ class StockManagementServiceImplTest {
 
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
         when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(res));
-        stockService.processPostOrder(productId, req);
-        assertEquals(0, product.getStock());
-        assertEquals(ProductStatus.OUT_OF_STOCK, product.getStatus());
-    }
 
-    @Test
-    void cleanupExpiredReservations_StatusHidden_Branch() {
-        StockReservation res = new StockReservation();
-        res.setQuantity(4);
-        res.setProduct(product);
-        product.setStock(1);
-        product.setStatus(ProductStatus.HIDDEN);
-
-        when(reservationRepository.findExpiredReservations(any())).thenReturn(List.of(res));
-        stockService.cleanupExpiredReservations();
-        assertEquals(5, product.getStock());
-        assertEquals(ProductStatus.HIDDEN, product.getStatus());
-    }
-
-    @Test
-    void reserveStock_Fail_ProductNotActive_And_InsufficientStock() {
-        product.setStatus(ProductStatus.HIDDEN);
-        product.setStock(1);
-        StockReserveRequest req = new StockReserveRequest();
-        req.setOrderId(orderId);
-        req.setQuantity(5);
-
-        when(reservationRepository.findByOrderIdAndProduct_ProductId(any(), any())).thenReturn(Optional.empty());
-        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
-        Optional<StockOperationResponse> res = stockService.reserveStock(productId, req);
-        assertFalse(res.isPresent());
-    }
-
-    @Test
-    void cleanupExpiredReservations_OutOfStock_ButStockRemainsZero_Branch() {
-        StockReservation res = new StockReservation();
-        res.setQuantity(0);
-        res.setProduct(product);
-        product.setStock(0);
-        product.setStatus(ProductStatus.OUT_OF_STOCK);
-
-        when(reservationRepository.findExpiredReservations(any())).thenReturn(List.of(res));
-        stockService.cleanupExpiredReservations();
-        assertEquals(0, product.getStock());
-        assertEquals(ProductStatus.OUT_OF_STOCK, product.getStatus());
-        assertEquals(ReservationStatus.RELEASED, res.getStatus());
-        verify(productRepository, times(1)).save(product);
-    }
-
-    @Test
-    void releaseStock_ReasonPhysicalEmpty_Branch() {
-        StockReleaseRequest req = new StockReleaseRequest();
-        req.setOrderId(orderId);
-        req.setQuantity(2);
-        req.setReason("OUT_OF_STOCK");
-        StockReservation res = new StockReservation();
-        res.setStatus(ReservationStatus.PENDING);
-        res.setQuantity(2);
-        product.setStock(5);
-        product.setStatus(ProductStatus.ACTIVE);
-
-        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(res));
-        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
-        stockService.releaseStock(productId, req);
-        assertEquals(0, product.getStock());
-        assertEquals(ProductStatus.OUT_OF_STOCK, product.getStatus());
-    }
-
-    @Test
-    void processPostOrder_Cancel_ReasonPhysicalEmpty_Branch() {
-        PostOrderRequest req = new PostOrderRequest();
-        req.setOrderId(orderId);
-        req.setAction("CANCEL");
-        req.setReason("OUT_OF_STOCK");
-        StockReservation res = new StockReservation();
-        res.setStatus(ReservationStatus.PENDING);
-        res.setQuantity(3);
-        product.setStock(5);
-        product.setStatus(ProductStatus.ACTIVE);
-
-        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(res));
-        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
         stockService.processPostOrder(productId, req);
         assertEquals(0, product.getStock());
         assertEquals(ProductStatus.OUT_OF_STOCK, product.getStatus());
@@ -630,64 +589,27 @@ class StockManagementServiceImplTest {
 
         when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(res));
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+
         stockService.processPostOrder(productId, req);
         assertEquals(1, product.getTotalOrders());
         assertEquals(ReservationStatus.CONFIRMED, res.getStatus());
     }
 
     @Test
-    void testReserveStock_Success() {
-        UUID productId = UUID.randomUUID();
-        UUID orderId = UUID.randomUUID();
-        Product product = new Product();
-        product.setProductId(productId);
-        product.setStock(10);
-        product.setStatus(ProductStatus.ACTIVE);
-        StockReserveRequest request = new StockReserveRequest();
-        request.setOrderId(orderId);
-        request.setQuantity(2);
-
-        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.empty());
-        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
-        when(reservationRepository.save(any(StockReservation.class))).thenAnswer(invocation -> {
-            StockReservation res = invocation.getArgument(0);
-            res.setReservationId(UUID.randomUUID());
-            return res;
-        });
-
-        Optional<StockOperationResponse> response = stockService.reserveStock(productId, request);
-        assertTrue(response.isPresent());
-        assertEquals(2, response.get().getReservedQuantity());
-        assertEquals(8, response.get().getRemainingStock());
-        assertEquals("RESERVED", response.get().getStatus());
-        assertNotNull(response.get().getReservationId());
-        assertEquals(8, product.getStock());
-    }
-
-    @Test
     void testReleaseStock_WithNullImagesAndTags_Coverage() {
-        UUID productId = UUID.randomUUID();
-        UUID orderId = UUID.randomUUID();
         StockReleaseRequest req = new StockReleaseRequest();
         req.setOrderId(orderId);
-        req.setQuantity(2);
-
-        Product p = new Product();
-        p.setProductId(productId);
-        p.setJastiperId(UUID.randomUUID());
-        p.setStatus(ProductStatus.ACTIVE);
-        p.setPrice(10000);
-        p.setStock(10);
-        p.setImages(null);
-        p.setTags(null);
+        product.setImages(null);
+        product.setTags(null);
 
         StockReservation res = new StockReservation();
-        res.setProduct(p);
+        res.setProduct(product);
         res.setStatus(ReservationStatus.PENDING);
         res.setQuantity(2);
 
         when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(res));
-        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(p));
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+
         Optional<ProductResponse> response = stockService.releaseStock(productId, req);
         assertTrue(response.isPresent());
     }

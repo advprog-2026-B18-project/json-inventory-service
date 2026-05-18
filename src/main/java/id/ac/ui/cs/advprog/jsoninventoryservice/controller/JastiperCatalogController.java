@@ -25,7 +25,7 @@ public class JastiperCatalogController {
 
     @GetMapping("/{username}/products")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getJastiperCatalog(
-            @PathVariable String username,
+            @PathVariable("username") String username,
             @RequestParam(required = false, name = "q") String q,
             @RequestParam(required = false, name = "min_price") Long minPrice,
             @RequestParam(required = false, name = "max_price") Long maxPrice,

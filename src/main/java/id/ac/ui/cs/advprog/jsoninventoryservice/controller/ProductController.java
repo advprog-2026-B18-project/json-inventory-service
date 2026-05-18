@@ -5,6 +5,7 @@ import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductSearchCriteri
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductUpdateRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.ProductResponse;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
+import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ShoppingMode;
 import id.ac.ui.cs.advprog.jsoninventoryservice.service.ProductService;
 import id.ac.ui.cs.advprog.jsoninventoryservice.utils.ApiResponse;
 import id.ac.ui.cs.advprog.jsoninventoryservice.utils.ResponseUtil;
@@ -31,7 +32,7 @@ public class ProductController {
     private final ProductService productService;
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<ProductResponse>> getProductDetailPublic(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<ProductResponse>> getProductDetailPublic(@PathVariable("id") UUID id) {
         return productService.getProductById(id).map(p -> ResponseUtil.success(p, "Successfully fetched product details."))
                 .orElse(ResponseUtil.notFound("Product not found with ID: " + id));
     }
@@ -48,7 +49,7 @@ public class ProductController {
     @PatchMapping("/{id}")
     public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
             @RequestAttribute("jastiperId") UUID jastiperId,
-            @PathVariable UUID id,
+            @PathVariable("id") UUID id,
             @Valid @RequestBody ProductUpdateRequest request) {
         return productService.updateProduct(jastiperId, id, request)
                 .map(p -> ResponseUtil.success(p, "Product updated successfully."))
@@ -59,7 +60,7 @@ public class ProductController {
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteProduct(
             @RequestAttribute("jastiperId") UUID jastiperId,
-            @PathVariable UUID id) {
+            @PathVariable("id") UUID id) {
         productService.deleteProduct(jastiperId, id);
         return ResponseUtil.success(null, "Product deleted successfully.");
     }
@@ -67,13 +68,14 @@ public class ProductController {
     @GetMapping
     public ResponseEntity<ApiResponse<Map<String, Object>>> searchProducts(
             @RequestParam(required = false) String q,
-            @RequestParam(required = false) UUID jastiperId,
-            @RequestParam(required = false) Long minPrice,
-            @RequestParam(required = false) Long maxPrice,
-            @RequestParam(required = false) Integer categoryId,
+            @RequestParam(required = false, name = "jastiper_id") UUID jastiperId,
+            @RequestParam(required = false, name = "min_price") Long minPrice,
+            @RequestParam(required = false, name = "max_price") Long maxPrice,
+            @RequestParam(required = false, name = "category_id") Integer categoryId,
             @RequestParam(required = false, name = "origin_country") String originCountry,
             @RequestParam(required = false, name = "purchase_date_from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam(required = false, name = "purchase_date_to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+            @RequestParam(required = false) String mode,
             @RequestParam(required = false, defaultValue = "1") int page,
             @RequestParam(required = false, defaultValue = "20") int limit,
             @RequestParam(required = false, defaultValue = "created_at") String sortBy,
@@ -98,6 +100,15 @@ public class ProductController {
         }
         Pageable pageable = PageRequest.of(page - 1, limit, sort);
 
+        ShoppingMode filterMode = null;
+        if (mode != null && !mode.trim().isEmpty()) {
+            try {
+                filterMode = ShoppingMode.valueOf(mode.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                return ResponseUtil.success(buildPaginationMap(Page.empty(pageable)), "Search results fetched.");
+            }
+        }
+
         ProductSearchCriteria criteria = ProductSearchCriteria.builder()
                 .keyword(q)
                 .jastiperId(jastiperId)
@@ -107,6 +118,7 @@ public class ProductController {
                 .originCountry(originCountry)
                 .dateFrom(dateFrom)
                 .dateTo(dateTo)
+                .mode(filterMode)
                 .build();
 
         Page<ProductResponse> productPage = productService.searchProductsPublic(criteria, pageable);
@@ -144,7 +156,7 @@ public class ProductController {
     @GetMapping("/my/{id}")
     public ResponseEntity<ApiResponse<ProductResponse>> getMyProductDetail(
             @RequestAttribute("jastiperId") UUID jastiperId,
-            @PathVariable UUID id) {
+            @PathVariable("id") UUID id) {
 
         return productService.getProductById(id)
                 .filter(p -> p.getJastiper() != null && p.getJastiper().getUserId().equals(jastiperId))

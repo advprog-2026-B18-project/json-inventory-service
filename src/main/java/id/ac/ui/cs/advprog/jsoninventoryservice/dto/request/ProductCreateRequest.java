@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -46,4 +47,12 @@ public class ProductCreateRequest {
     private List<String> images;
 
     private List<String> tags;
+
+    private String mode;
+
+    @JsonProperty("flash_sale_start")
+    private LocalDateTime flashSaleStart;
+
+    @JsonProperty("flash_sale_end")
+    private LocalDateTime flashSaleEnd;
 }

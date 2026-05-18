@@ -119,7 +119,7 @@ class AdminProductServiceImplTest {
         Optional<ProductResponse> res = adminService.moderateProduct(adminId, productId, req);
         assertTrue(res.isPresent());
         assertNotNull(product.getDeletedAt());
-        assertEquals(ProductStatus.HIDDEN, product.getStatus());
+        assertEquals(ProductStatus.REMOVED_BY_ADMIN, product.getStatus());
         verify(moderationLogRepository).save(any(ModerationLog.class));
         verify(eventPublisher, times(1)).publishEvent(any(ProductModeratedEvent.class));
     }

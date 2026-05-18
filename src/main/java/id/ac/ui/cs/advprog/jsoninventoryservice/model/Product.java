@@ -1,6 +1,7 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.model;
 
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
+import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ShoppingMode;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -102,4 +103,15 @@ public class Product {
     @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    @Builder.Default
+    private ShoppingMode mode = ShoppingMode.LIVE;
+
+    @Column(name = "flash_sale_start")
+    private LocalDateTime flashSaleStart;
+
+    @Column(name = "flash_sale_end")
+    private LocalDateTime flashSaleEnd;
 }

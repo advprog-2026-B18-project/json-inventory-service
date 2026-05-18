@@ -49,7 +49,7 @@ public class AdminProductController {
     @PatchMapping("/{id}/moderate")
     public ResponseEntity<ApiResponse<ProductResponse>> moderateProduct(
            @RequestAttribute("adminId") UUID adminId,
-           @PathVariable UUID id,
+           @PathVariable("id") UUID id,
            @RequestBody AdminProductUpdateRequest request) {
 
         try {
@@ -65,7 +65,7 @@ public class AdminProductController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<ProductResponse>> getAdminProductDetail(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<ProductResponse>> getAdminProductDetail(@PathVariable("id") UUID id) {
         return adminService.getAdminProductDetail(id)
                 .map(p -> ResponseUtil.success(p, "Admin product details successfully retrieved."))
                 .orElse(ResponseUtil.notFound("Product not found."));

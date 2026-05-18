@@ -49,7 +49,6 @@ class ModelCreationTest {
         reservation.setQuantity(2);
         reservation.setStatus(ReservationStatus.PENDING);
         reservation.setCreatedAt(LocalDateTime.now());
-        reservation.setExpiresAt(LocalDateTime.now().plusMinutes(15));
 
         assertNotNull(reservation);
         assertEquals(ReservationStatus.PENDING, reservation.getStatus());
