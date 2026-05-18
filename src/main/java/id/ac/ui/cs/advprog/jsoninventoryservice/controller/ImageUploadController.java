@@ -1,5 +1,6 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.controller;
 
+import id.ac.ui.cs.advprog.jsoninventoryservice.exception.ImageUploadException;
 import id.ac.ui.cs.advprog.jsoninventoryservice.service.StorageService;
 import id.ac.ui.cs.advprog.jsoninventoryservice.utils.ApiResponse;
 import id.ac.ui.cs.advprog.jsoninventoryservice.utils.ResponseUtil;
@@ -24,7 +25,7 @@ public class ImageUploadController {
             String imageUrl = storageService.uploadFile(file);
             return ResponseUtil.success(Map.of("image_url", imageUrl), "Image uploaded successfully");
         } catch (IOException e) {
-            throw new RuntimeException("Failed to upload image to S3", e);
+            throw new ImageUploadException("Failed to upload image to S3", e);
         }
     }
 }

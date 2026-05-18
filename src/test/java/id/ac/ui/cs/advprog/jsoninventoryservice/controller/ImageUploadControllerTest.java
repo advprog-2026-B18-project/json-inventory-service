@@ -1,5 +1,6 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.controller;
 
+import id.ac.ui.cs.advprog.jsoninventoryservice.exception.ImageUploadException;
 import id.ac.ui.cs.advprog.jsoninventoryservice.service.StorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -63,7 +64,7 @@ class ImageUploadControllerTest {
                     .file(file));
         });
 
-        assertInstanceOf(RuntimeException.class, exception.getRootCause());
+        assertInstanceOf(ImageUploadException.class, exception.getRootCause());
         assertTrue(exception.getRootCause().getMessage().contains("Failed to upload image to S3"));
 
         verify(storageService, times(1)).uploadFile(any());
