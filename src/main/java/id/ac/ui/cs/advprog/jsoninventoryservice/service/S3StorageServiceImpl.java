@@ -17,13 +17,16 @@ public class S3StorageServiceImpl implements StorageService {
 
     private final S3Client s3Client;
 
-    @Value("${aws.s3.bucket-name}")
+    @Value("${aws.s3.bucket-name:none}")
     private String bucketName;
 
     @Override
     public String uploadFile(MultipartFile file) throws IOException {
         String originalFilename = file.getOriginalFilename();
-        String extension = originalFilename != null ? originalFilename.substring(originalFilename.lastIndexOf(".")) : "";
+        String extension = (originalFilename != null && originalFilename.contains("."))
+                ? originalFilename.substring(originalFilename.lastIndexOf("."))
+                : "";
+
         String uniqueFileName = UUID.randomUUID().toString() + extension;
 
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
