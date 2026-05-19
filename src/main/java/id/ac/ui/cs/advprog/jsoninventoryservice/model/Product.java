@@ -78,8 +78,7 @@ public class Product {
     private List<String> tags = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
-    @Builder.Default
+    @Column(name = "\"mode\"", nullable = false, length = 30)    @Builder.Default
     private ProductStatus status = ProductStatus.ACTIVE;
 
     @Column(name = "avg_rating")
