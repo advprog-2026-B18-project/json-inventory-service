@@ -48,6 +48,32 @@ jobs:
           push: true
           tags: ghcr.io/advprog-2026-b18-project/json-inventory-service:latest
           
+      # Dynamically generate the .env file on the GitHub Runner
+      - name: Generate .env file
+        env:
+          DB_URL: ${{ secrets.DB_URL_INVENTORY }}
+          DB_USER: ${{ secrets.DB_USER_INVENTORY }}
+          DB_PASS: ${{ secrets.DB_PASS_INVENTORY }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          INTERNAL_KEY: ${{ secrets.INTERNAL_SERVICE_KEY }}
+        run: |
+          echo "SPRING_DATASOURCE_URL=$DB_URL" >> .env
+          echo "SPRING_DATASOURCE_USERNAME=$DB_USER" >> .env
+          echo "SPRING_DATASOURCE_PASSWORD=$DB_PASS" >> .env
+          echo "JWT_SECRET=$JWT_SECRET" >> .env
+          echo "INTERNAL_SERVICE_KEY=$INTERNAL_KEY" >> .env
+
+      # Copy docker-compose.yml and the newly generated .env via scp
+      - name: Copy files via scp
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "docker-compose.yml,.env" 
+          target: "/home/ubuntu/"
+
+      # Deploy on EC2 
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -57,4 +83,5 @@ jobs:
           script: |
             docker pull ghcr.io/advprog-2026-b18-project/json-inventory-service:latest
             docker compose -f /home/ubuntu/docker-compose.yml up -d --no-deps --build ${{ env.SERVICE_NAME }}
-            docker image prune -f
+            chmod 600 /home/ubuntu/.env
+            docker image prune -af
