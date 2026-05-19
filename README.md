@@ -1,166 +1,78 @@
-# Modul : Inventory & Katalog (json-inventory-service)
-
-Microservice untuk mengelola **Modul Inventory & Katalog** pada platform JSON (Jasa Titip Online).
-
-## Tanggung Jawab Modul
-
-Modul ini berfungsi sebagai pusat pengelolaan data barang titipan. Modul ini memfasilitasi Jastiper dalam mengatur stok dagangan, memudahkan Titipers dalam mencari dan menelusuri katalog barang yang tersedia, serta menangani mekanisme pengurangan stok secara atomik untuk mencegah *overselling*.
-
----
-
-## Yang Dilakukan Modul Ini
-
-### Manajemen Katalog (Jastiper)
-- Menyediakan fungsionalitas bagi Jastiper untuk membuat, melihat, memperbarui (partial update), dan menghapus produk miliknya dari katalog.
-- Mengelola status visibilitas produk secara otomatis (misalnya, stok 0 akan otomatis berstatus `OUT_OF_STOCK`).
-
-### Pencarian & Browsing (Publik)
-- Memfasilitasi Titipers untuk mencari produk berdasarkan kata kunci (full-text search), kategori, rentang harga, dan negara asal.
-- Menampilkan katalog khusus per Jastiper dan detail lengkap produk beserta ulasan.
-
-### Manajemen Stok (Internal)
-- Menangani reservasi stok melalui *database-level atomic operation* dengan *optimistic locking* saat pesanan dibuat oleh Modul Order.
-- Mengembalikan stok yang direservasi jika pesanan dibatalkan atau gagal diproses.
-- Memperbarui stok permanen serta statistik *rating* dan *review* setelah pesanan selesai.
-
-### Monitoring & Moderasi (Admin)
-- Menyediakan endpoint bagi Admin untuk memonitor seluruh produk.
-- Memfasilitasi aksi moderasi (seperti menyembunyikan atau menghapus) terhadap produk yang melanggar aturan, lengkap dengan *audit log*.
-- Mengelola hierarki Kategori Produk (CRUD) yang digunakan sebagai filter pencarian.
-
----
-
-## Tech Stack
-
-- **Java** + **Spring Boot** - web framework
-- **Hibernate** - ORM
-- **PostgreSQL** (Neon DB) - database
-
----
-
-## Database Schema
+## Database Schema (Neon DB - PostgreSQL)
 
 ### Custom Types
 
-#### `product_status`
-| Value |
-| --- |
-| ACTIVE  |
-| OUT_OF_STOCK  |
-| HIDDEN  |
-| REMOVED_BY_ADMIN  |
-
-#### `reservation_status`
-| Value |
-| --- |
-| PENDING  |
-| CONFIRMED  |
-| RELEASED  |
-
-#### `moderation_action`
-| Value |
-| --- |
-| REMOVE  |
-| RESTORE  |
-| HIDE  |
-| ACTIVATE  |
+* **product_status**: `ACTIVE`, `OUT_OF_STOCK`, `HIDDEN`, `REMOVED_BY_ADMIN`
+* **reservation_status**: `PENDING`, `CONFIRMED`, `RELEASED`
+* **moderation_action**: `REMOVE`, `RESTORE`, `HIDE`, `ACTIVATE`
 
 ---
 
-### Object: Product
+### 1. Object: Category (`categories`)
 
-Entitas ini menyimpan seluruh informasi detail barang titipan yang dikelola oleh Jastiper, termasuk harga, stok, asal negara, dan metrik statistik order.
+| Field | Type | Nullable | Key | Default |
+| --- | --- | --- | --- | --- |
+| category_id | SERIAL | NOT NULL | PK |  |
+| name | VARCHAR(100) | NOT NULL | UK |  |
+| slug | VARCHAR(255) | NOT NULL | UK |  |
+| description | TEXT | NULL |  |  |
+| product_count | INTEGER | NOT NULL |  | 0 |
+| created_at | TIMESTAMP | NULL |  | CURRENT_TIMESTAMP |
 
-| Field | Type | Nullable | Key |
-| --- | --- | --- | --- |
-| product_id | VARCHAR (36) | NOT NULL  | PK |
-| jastiper_id | VARCHAR (36) | NOT NULL  | FK |
-| category_id | INTEGER | NULL  | FK |
-| name | VARCHAR (255) | NOT NULL  | |
-| description | TEXT | NOT NULL  | |
-| price | LONG | NOT NULL  | |
-| service_fee | LONG | NOT NULL  | |
-| stock | INTEGER | NOT NULL  | |
-| origin_country | VARCHAR | NOT NULL  | |
-| purchase_date | DATE | NOT NULL  | |
-| images | TEXT | NOT NULL  | |
-| weight_gram | INTEGER | NULL  | |
-| tags | TEXT | NOT NULL  | |
-| status | *product_status* | NOT NULL  | |
-| avg_rating | FLOAT | NULL  | |
-| total_reviews | INTEGER | NOT NULL  | |
-| total_orders | INTEGER | NOT NULL  | |
-| deleted_at | DATETIME (ISO 8601) | NULL  | |
-| created_at | DATETIME (ISO 8601) | NOT NULL  | |
-| updated_at | DATETIME (ISO 8601) | NOT NULL  | |
+### 2. Object: Product (`products`)
 
-**PK:** product_id 
+| Field | Type | Nullable | Key | Default | Notes |
+| --- | --- | --- | --- | --- | --- |
+| product_id | UUID | NOT NULL | PK | uuid_generate_v4() |  |
+| jastiper_id | UUID | NOT NULL | Logical FK |  | Refers to Modul Auth |
+| category_id | INTEGER | NULL | FK |  | Refers to `categories` |
+| name | VARCHAR(255) | NOT NULL |  |  |  |
+| description | TEXT | NOT NULL |  |  |  |
+| price | BIGINT | NOT NULL |  |  | CHECK (price >= 0) |
+| service_fee | BIGINT | NOT NULL |  | 0 | CHECK (service_fee >= 0) |
+| stock | INTEGER | NOT NULL |  |  | CHECK (stock >= 0) |
+| origin_country | VARCHAR(255) | NOT NULL |  |  |  |
+| purchase_date | DATE | NOT NULL |  |  |  |
+| weight_gram | INTEGER | NULL |  |  |  |
+| images | TEXT[] | NULL |  | '{}' |  |
+| tags | TEXT[] | NULL |  | '{}' |  |
+| status | product_status | NOT NULL |  | 'ACTIVE' |  |
+| avg_rating | FLOAT | NULL |  |  |  |
+| total_reviews | INTEGER | NOT NULL |  | 0 |  |
+| total_orders | INTEGER | NOT NULL |  | 0 |  |
+| deleted_at | TIMESTAMP | NULL |  |  |  |
+| created_at | TIMESTAMP | NULL |  | CURRENT_TIMESTAMP |  |
+| updated_at | TIMESTAMP | NULL |  | CURRENT_TIMESTAMP |  |
 
-**Notes:**
-- **stock**: Jumlah stok tersedia. Constraint di level DB memastikan nilai tidak boleh negatif.
-- **deleted_at**: Menyimpan timestamp untuk *soft-delete* produk.
-- **images & tags**: Disimpan dalam bentuk *array string* atau format teks berstruktur (JSON/Comma-separated) dengan nilai default array kosong.
+### 3. Object: Stock Reservation (`stock_reservations`)
 
----
+| Field | Type | Nullable | Key | Default | Notes |
+| --- | --- | --- | --- | --- | --- |
+| reservation_id | UUID | NOT NULL | PK | uuid_generate_v4() |  |
+| product_id | UUID | NOT NULL | FK, Composite UK |  | Refers to `products` |
+| order_id | UUID | NOT NULL | Composite UK |  | Refers to Modul Order |
+| quantity | INTEGER | NOT NULL |  |  | CHECK (quantity > 0) |
+| status | reservation_status | NOT NULL |  | 'PENDING' |  |
+| created_at | TIMESTAMP | NULL |  | CURRENT_TIMESTAMP |  |
+| expires_at | TIMESTAMP | NULL |  |  |  |
 
-### Object: Category
+> **Note:** Terdapat constraint `UNIQUE (order_id, product_id)` untuk mencegah duplikasi reservasi produk pada pesanan yang sama.
 
-Entitas ini menyimpan daftar klasifikasi kategori untuk memudahkan navigasi katalog oleh pengguna.
+### 4. Object: Moderation Log (`moderation_logs`)
 
-| Field | Type | Nullable | Key |
-| --- | --- | --- | --- |
-| category_id | INTEGER | NOT NULL  | PK |
-| name | VARCHAR (100) | NOT NULL  | UK |
-| slug | VARCHAR | NOT NULL  | UK |
-| description | TEXT | NULL  | |
-| product_count | INTEGER | NOT NULL  | |
-| created_at | DATETIME (ISO 8601) | NOT NULL  | |
-
-**PK:** category_id 
-
-**Notes:**
-- **product_count**: *Computed field* yang melacak jumlah produk aktif dalam kategori ini.
-- **name & slug**: Bersifat unik (Unique Key).
-
----
-
-### Object: Stock Reservation
-
-Entitas ini mencatat histori reservasi stok sementara (menahan kuota) saat sebuah order sedang diproses dalam tahap *checkout*, mencegah kondisi *race condition*.
-
-| Field | Type | Nullable | Key |
-| --- | --- | --- | --- |
-| reservation_id | VARCHAR (36) | NOT NULL  | PK |
-| product_id | VARCHAR (36) | NOT NULL  | FK |
-| order_id | VARCHAR (36) | NOT NULL  | UK |
-| quantity | INTEGER | NOT NULL  | |
-| status | *reservation_status*| NOT NULL  | |
-| created_at | DATETIME (ISO 8601) | NOT NULL  | |
-| expires_at | DATETIME (ISO 8601) | NULL  | |
-
-**PK:** reservation_id 
-
-**Notes:**
-- **order_id**: Foreign key ke tabel Order. Digunakan sebagai pencegahan idempotensi (agar 1 order tidak mereservasi stok ganda).
-- **expires_at**: Reservasi yang kadaluarsa akan otomatis dilepas kembali ke `stock` utama.
+| Field | Type | Nullable | Key | Default | Notes |
+| --- | --- | --- | --- | --- | --- |
+| log_id | UUID | NOT NULL | PK | uuid_generate_v4() |  |
+| product_id | UUID | NOT NULL | FK |  | Refers to `products` |
+| admin_id | UUID | NOT NULL | Logical FK |  | Refers to Modul Auth |
+| action | moderation_action | NOT NULL |  |  |  |
+| reason | TEXT | NOT NULL |  |  |  |
+| created_at | TIMESTAMP | NULL |  | CURRENT_TIMESTAMP |  |
 
 ---
 
-### Object: Moderation Log
+### Database Indexes
 
-Entitas ini bertindak sebagai *audit trail* ketika Admin melakukan tindakan terhadap sebuah produk (misalnya menyembunyikan karena pelanggaran).
-
-| Field | Type | Nullable | Key |
-| --- | --- | --- | --- |
-| log_id | VARCHAR (36) | NOT NULL  | PK |
-| product_id | VARCHAR (36) | NOT NULL  | FK |
-| admin_id | VARCHAR (36) | NOT NULL  | FK |
-| action | *moderation_action* | NOT NULL  | |
-| reason | VARCHAR | NOT NULL  | |
-| created_at | DATETIME (ISO 8601) | NOT NULL  | |
-
-**PK:** log_id 
-
-**Notes:**
-- **admin_id**: Menyimpan referensi User (dengan *role* ADMIN) yang melakukan aksi moderasi tersebut.
-- **reason**: Alasan moderasi yang wajib diisi dan dicatat dalam sistem.
+1. `idx_products_search`: Menggunakan algoritma **GIN** (`to_tsvector`) untuk optimasi pencarian full-text pada kolom `name` dan `description`.
+2. `idx_products_jastiper`: Optimasi query berdasarkan `jastiper_id`.
+3. `idx_products_status`: Optimasi query untuk filter produk berdasarkan statusnya (`ACTIVE`, dll).
