@@ -1,0 +1,9 @@
+services:
+  inventory-service:
+    image: ghcr.io/advprog-2026-b18-project/json-inventory-service:latest
+    container_name: inventory-service
+    ports:
+      - "8083:8083"
+    env_file:
+      - .env
+    restart: always
