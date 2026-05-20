@@ -44,7 +44,7 @@ class ImageUploadControllerTest {
 
         when(storageService.uploadFile(any())).thenReturn(expectedUrl);
 
-        mockMvc.perform(multipart("/internal/products/images/upload")
+        mockMvc.perform(multipart("/api/products/images/upload")
                         .file(file))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -60,7 +60,7 @@ class ImageUploadControllerTest {
         when(storageService.uploadFile(any())).thenThrow(new IOException("S3 connection error"));
 
         ServletException exception = assertThrows(ServletException.class, () -> {
-            mockMvc.perform(multipart("/internal/products/images/upload")
+            mockMvc.perform(multipart("/api/products/images/upload")
                     .file(file));
         });
 
