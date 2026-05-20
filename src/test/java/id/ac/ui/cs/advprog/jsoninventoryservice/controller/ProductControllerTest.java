@@ -182,7 +182,7 @@ class ProductControllerTest {
 
     @Test
     void testGetMyProductDetail_Success() throws Exception {
-        when(productService.getProductById(productId)).thenReturn(Optional.of(dummyResponse));
+        when(productService.getMyProductDetail(productId, jastiperId)).thenReturn(Optional.of(dummyResponse));
 
         mockMvc.perform(get("/products/my/" + productId)
                         .requestAttr("jastiperId", jastiperId))
@@ -192,8 +192,7 @@ class ProductControllerTest {
 
     @Test
     void testGetMyProductDetail_UnauthorizedOrNotFound() throws Exception {
-        ProductResponse wrongOwnerResponse = new ProductResponse();
-        when(productService.getProductById(productId)).thenReturn(Optional.of(wrongOwnerResponse));
+        when(productService.getMyProductDetail(productId, jastiperId)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/products/my/" + productId)
                         .requestAttr("jastiperId", jastiperId))
@@ -228,11 +227,7 @@ class ProductControllerTest {
     @Test
     @WithMockUser(roles = "JASTIPER")
     void testGetMyProductDetail_NullJastiperInfo() throws Exception {
-        ProductResponse noJastiperResponse = new ProductResponse();
-        noJastiperResponse.setProductId(productId);
-        noJastiperResponse.setJastiper(null);
-
-        when(productService.getProductById(productId)).thenReturn(Optional.of(noJastiperResponse));
+        when(productService.getMyProductDetail(productId, jastiperId)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/products/my/" + productId)
                         .requestAttr("jastiperId", jastiperId))
@@ -242,11 +237,7 @@ class ProductControllerTest {
     @Test
     @WithMockUser(roles = "JASTIPER")
     void testGetMyProductDetail_NullJastiperObject() throws Exception {
-        ProductResponse responseWithNullJastiper = new ProductResponse();
-        responseWithNullJastiper.setProductId(productId);
-        responseWithNullJastiper.setJastiper(null);
-
-        when(productService.getProductById(productId)).thenReturn(Optional.of(responseWithNullJastiper));
+        when(productService.getMyProductDetail(productId, jastiperId)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/products/my/" + productId)
                         .requestAttr("jastiperId", jastiperId))
@@ -256,11 +247,7 @@ class ProductControllerTest {
     @Test
     @WithMockUser(roles = "JASTIPER")
     void testGetMyProductDetail_WrongJastiperId_Branch() throws Exception {
-        ProductResponse wrongOwnerResponse = new ProductResponse();
-        wrongOwnerResponse.setProductId(productId);
-        wrongOwnerResponse.setJastiper(ProductResponse.JastiperInfo.builder().userId(UUID.randomUUID()).build());
-
-        when(productService.getProductById(productId)).thenReturn(Optional.of(wrongOwnerResponse));
+        when(productService.getMyProductDetail(productId, jastiperId)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/products/my/" + productId)
                         .requestAttr("jastiperId", jastiperId))

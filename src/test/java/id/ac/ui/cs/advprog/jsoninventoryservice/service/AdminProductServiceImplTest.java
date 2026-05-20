@@ -5,17 +5,20 @@ import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.ProductResponse;
 import id.ac.ui.cs.advprog.jsoninventoryservice.event.ProductModeratedEvent;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.ModerationLog;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.Product;
+import id.ac.ui.cs.advprog.jsoninventoryservice.model.Category;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ModerationAction;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
 import id.ac.ui.cs.advprog.jsoninventoryservice.repository.ModerationLogRepository;
 import id.ac.ui.cs.advprog.jsoninventoryservice.repository.ProductRepository;
 import id.ac.ui.cs.advprog.jsoninventoryservice.repository.StockReservationRepository;
+import id.ac.ui.cs.advprog.jsoninventoryservice.repository.CategoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -23,16 +26,22 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
 import jakarta.persistence.criteria.*;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -40,6 +49,8 @@ import static org.mockito.Mockito.*;
 @SuppressWarnings({"unchecked", "rawtypes"})
 class AdminProductServiceImplTest {
     @Mock private ProductRepository productRepository;
+    @Mock private CategoryRepository categoryRepository;
+    @Mock private AuthIntegrationService authIntegrationService;
     @Mock private ModerationLogRepository moderationLogRepository;
     @Mock private StockReservationRepository stockReservationRepository;
     @Mock private ApplicationEventPublisher eventPublisher;
@@ -212,7 +223,8 @@ class AdminProductServiceImplTest {
 
     @Test
     void testGetAdminProductDetail_WithNullImagesAndTags_Coverage() {
-        UUID localProductId = UUID.randomUUID();        Product p = new Product();
+        UUID localProductId = UUID.randomUUID();
+        Product p = new Product();
         p.setProductId(localProductId);
         p.setJastiperId(UUID.randomUUID());
         p.setStatus(ProductStatus.ACTIVE);
@@ -226,5 +238,237 @@ class AdminProductServiceImplTest {
         Optional<ProductResponse> response = adminService.getAdminProductDetail(localProductId);
         assertTrue(response.isPresent());
         assertNull(response.get().getImages());
+    }
+
+    @Test
+    void testEnrichProductResponse_WithCategoryAndCompleteProfile() throws Exception {
+        String keyword = "test";
+        Pageable pageable = PageRequest.of(0, 10);
+        UUID mockJastiperId = UUID.randomUUID();
+        
+        Product adminProduct = Product.builder()
+                .productId(UUID.randomUUID())
+                .jastiperId(mockJastiperId)
+                .categoryId(1)
+                .name("Barang Admin")
+                .price(150000)
+                .stock(10)
+                .serviceFee(2000)
+                .weightGram(500)
+                .build();
+
+        Category dummyCategory = new Category();
+        dummyCategory.setCategoryId(1);
+        dummyCategory.setName("Elektronik");
+
+        Map<String, Object> mockProfile = new HashMap<>();
+        mockProfile.put("username", "admin_jastip");
+        mockProfile.put("full_name", "Admin Jastip");
+        mockProfile.put("profile_picture_url", "http://image.png");
+        mockProfile.put("avg_rating", 4.8);
+
+        Page<Product> page = new PageImpl<>(List.of(adminProduct));
+        when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(categoryRepository.findById(1)).thenReturn(Optional.of(dummyCategory));
+        when(authIntegrationService.getJastiperProfile(mockJastiperId)).thenReturn(mockProfile);
+
+        Page<ProductResponse> result = adminService.getAllProductsAdmin(keyword, null, null, null, pageable);
+
+        assertFalse(result.getContent().isEmpty());
+        ProductResponse response = result.getContent().get(0);
+        assertEquals("Elektronik", response.getCategory().getName());
+        assertEquals("admin_jastip", response.getJastiper().getUsername());
+        assertEquals(4.8, response.getJastiper().getAvgRating());
+    }
+
+    @Test
+    void testEnrichProductResponse_AuthServiceThrowsException_HitsCatchBlock() throws Exception {
+        String keyword = "test";
+        Pageable pageable = PageRequest.of(0, 10);
+        UUID mockJastiperId = UUID.randomUUID();
+        
+        Product adminProduct = Product.builder()
+                .productId(UUID.randomUUID())
+                .jastiperId(mockJastiperId)
+                .name("Barang Admin")
+                .price(150000)
+                .stock(10)
+                .serviceFee(2000)
+                .weightGram(500)
+                .build();
+
+        Page<Product> page = new PageImpl<>(List.of(adminProduct));
+        when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(authIntegrationService.getJastiperProfile(mockJastiperId)).thenThrow(new RuntimeException("Auth Service Down"));
+
+        Page<ProductResponse> result = adminService.getAllProductsAdmin(keyword, null, null, null, pageable);
+
+        assertFalse(result.getContent().isEmpty());
+        assertNull(result.getContent().get(0).getJastiper().getUsername());
+    }
+
+    @Test
+    void testEnrichProductResponse_ProfileMissingAvgRating() {
+        String keyword = "test";
+        Pageable pageable = PageRequest.of(0, 10);
+        UUID mockJastiperId = UUID.randomUUID();
+        
+        Product adminProduct = Product.builder()
+                .productId(UUID.randomUUID())
+                .jastiperId(mockJastiperId)
+                .name("Barang Test")
+                .price(5000)
+                .stock(5)
+                .serviceFee(1000)
+                .weightGram(100)
+                .build();
+
+        Map<String, Object> mockProfile = new HashMap<>();
+        mockProfile.put("username", "jastiper_no_rating");
+        mockProfile.put("full_name", "Jastiper No Rating");
+
+        Page<Product> page = new PageImpl<>(List.of(adminProduct));
+        when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(authIntegrationService.getJastiperProfile(mockJastiperId)).thenReturn(mockProfile);
+
+        Page<ProductResponse> result = adminService.getAllProductsAdmin(keyword, null, null, null, pageable);
+
+        assertFalse(result.getContent().isEmpty());
+        assertNull(result.getContent().get(0).getJastiper().getAvgRating());
+    }
+
+    @Test
+    void testEnrichProductResponse_ProfileIsEmptyOrNull() {
+        String keyword = "test";
+        Pageable pageable = PageRequest.of(0, 10);
+        UUID mockJastiperId = UUID.randomUUID();
+        
+        Product adminProduct = Product.builder()
+                .productId(UUID.randomUUID())
+                .jastiperId(mockJastiperId)
+                .name("Barang Test")
+                .price(5000)
+                .stock(5)
+                .serviceFee(1000)
+                .weightGram(100)
+                .build();
+
+        Page<Product> page = new PageImpl<>(List.of(adminProduct));
+        
+        when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(authIntegrationService.getJastiperProfile(mockJastiperId)).thenReturn(new HashMap<>());
+        Page<ProductResponse> resultEmpty = adminService.getAllProductsAdmin(keyword, null, null, null, pageable);
+        assertFalse(resultEmpty.getContent().isEmpty());
+
+        when(authIntegrationService.getJastiperProfile(mockJastiperId)).thenReturn(null);
+        Page<ProductResponse> resultNull = adminService.getAllProductsAdmin(keyword, null, null, null, pageable);
+        assertFalse(resultNull.getContent().isEmpty());
+    }
+
+    @Test
+    void testEnrichProductResponse_CategoryNotFoundAndNullChecking() {
+        String keyword = "test";
+        Pageable pageable = PageRequest.of(0, 10);
+        UUID mockJastiperId = UUID.randomUUID();
+        
+        Product adminProduct = Product.builder()
+                .productId(UUID.randomUUID())
+                .jastiperId(mockJastiperId)
+                .categoryId(999) 
+                .name("Barang Test")
+                .price(5000)
+                .stock(5)
+                .serviceFee(1000)
+                .weightGram(100)
+                .build();
+
+        Page<Product> page = new PageImpl<>(List.of(adminProduct));
+        when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        
+        when(categoryRepository.findById(999)).thenReturn(Optional.empty());
+        when(authIntegrationService.getJastiperProfile(mockJastiperId)).thenReturn(null);
+
+        Page<ProductResponse> result = adminService.getAllProductsAdmin(keyword, null, null, null, pageable);
+        assertFalse(result.getContent().isEmpty());
+    }
+
+    @Test
+    void testEnrichProductResponse_CategoryAndJastiperAlreadyNonNull_CoverFalseBranches() throws Exception {
+        String keyword = "test";
+        Pageable pageable = PageRequest.of(0, 10);
+        UUID mockJastiperId = UUID.randomUUID();
+        
+        Product adminProduct = Product.builder()
+                .productId(UUID.randomUUID())
+                .jastiperId(mockJastiperId)
+                .categoryId(1)
+                .name("Barang Sisa Coverage")
+                .price(5000)
+                .stock(5)
+                .serviceFee(1000)
+                .weightGram(100)
+                .build();
+
+        Category dummyCategory = new Category();
+        dummyCategory.setCategoryId(1);
+        dummyCategory.setName("Elektronik Baru");
+
+        Map<String, Object> mockProfile = new HashMap<>();
+        mockProfile.put("username", "jastiper_override");
+
+        Page<Product> page = new PageImpl<>(List.of(adminProduct));
+        when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(categoryRepository.findById(1)).thenReturn(Optional.of(dummyCategory));
+        when(authIntegrationService.getJastiperProfile(mockJastiperId)).thenReturn(mockProfile);
+
+        ProductResponse preInitializedResponse = new ProductResponse();
+        preInitializedResponse.setCategory(ProductResponse.CategoryInfo.builder().id(1).build());
+        preInitializedResponse.setJastiper(ProductResponse.JastiperInfo.builder().userId(mockJastiperId).build());
+
+        try (MockedStatic<ProductResponse> mockedResponse = mockStatic(ProductResponse.class)) {
+            mockedResponse.when(() -> ProductResponse.fromEntity(any(Product.class))).thenReturn(preInitializedResponse);
+
+            Page<ProductResponse> result = adminService.getAllProductsAdmin(keyword, null, null, null, pageable);
+
+            assertFalse(result.getContent().isEmpty());
+            ProductResponse response = result.getContent().get(0);
+            
+            assertEquals("Elektronik Baru", response.getCategory().getName());
+            assertEquals("jastiper_override", response.getJastiper().getUsername());
+        }
+    }
+
+    @Test
+    void testEnrichProductResponse_NullCategoryAndJastiper_CoversTrueBranches() {
+        UUID mockJastiperId = UUID.randomUUID();
+        Product adminProduct = new Product();
+        adminProduct.setProductId(UUID.randomUUID());
+        adminProduct.setCategoryId(3);
+        adminProduct.setJastiperId(mockJastiperId);
+
+        Category dummyCategory = new Category();
+        dummyCategory.setCategoryId(3);
+        dummyCategory.setName("Category 3");
+
+        when(productRepository.findById(adminProduct.getProductId())).thenReturn(Optional.of(adminProduct));
+        when(categoryRepository.findById(3)).thenReturn(Optional.of(dummyCategory));
+        when(authIntegrationService.getJastiperProfile(mockJastiperId)).thenReturn(null);
+
+        ProductResponse emptyResponse = new ProductResponse();
+
+        try (MockedStatic<ProductResponse> mocked = mockStatic(ProductResponse.class)) {
+            mocked.when(() -> ProductResponse.fromEntity(any(Product.class))).thenReturn(emptyResponse);
+            
+            Optional<ProductResponse> result = adminService.getAdminProductDetail(adminProduct.getProductId());
+            
+            assertTrue(result.isPresent());
+            
+            assertNotNull(result.get().getCategory());
+            assertEquals(3, result.get().getCategory().getId());
+            assertEquals("Category 3", result.get().getCategory().getName());
+            
+            assertNotNull(result.get().getJastiper());
+            assertEquals(mockJastiperId, result.get().getJastiper().getUserId());
+        }
     }
 }

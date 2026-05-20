@@ -32,6 +32,8 @@ import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -1068,5 +1070,67 @@ class ProductServiceImplTest {
         when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
 
         assertDoesNotThrow(() -> productService.updateProduct(jastiperId, productId, req));
+    }
+
+    @Test
+    void testGetMyProductDetail_Success() {
+        Product product = Product.builder()
+                .productId(productId)
+                .jastiperId(jastiperId)
+                .name("Product Jastiper")
+                .status(ProductStatus.HIDDEN)
+                .price(100000)
+                .stock(5)
+                .serviceFee(2000)
+                .weightGram(200)
+                .deletedAt(null)
+                .build();
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+
+        Optional<ProductResponse> result = productService.getMyProductDetail(productId, jastiperId);
+
+        assertTrue(result.isPresent());
+        assertEquals("Product Jastiper", result.get().getName());
+    }
+
+    @Test
+    void testGetMyProductDetail_ProductDeleted_ReturnsEmpty() {
+        Product deletedProduct = Product.builder()
+                .productId(productId)
+                .jastiperId(jastiperId)
+                .price(100000)
+                .stock(5)
+                .serviceFee(2000)
+                .weightGram(200)
+                .deletedAt(LocalDateTime.now())
+                .build();
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(deletedProduct));
+
+        Optional<ProductResponse> result = productService.getMyProductDetail(productId, jastiperId);
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void testGetMyProductDetail_WrongJastiperId_ReturnsEmpty() {
+        UUID strangerId = UUID.randomUUID();
+        
+        Product product = Product.builder()
+                .productId(productId)
+                .jastiperId(jastiperId)
+                .price(100000)
+                .stock(5)
+                .serviceFee(2000)
+                .weightGram(200)
+                .deletedAt(null)
+                .build();
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+
+        Optional<ProductResponse> result = productService.getMyProductDetail(productId, strangerId);
+
+        assertTrue(result.isEmpty());
     }
 }
