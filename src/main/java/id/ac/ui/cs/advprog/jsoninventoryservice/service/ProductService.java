@@ -17,4 +17,5 @@ public interface ProductService {
     ProductResponse createProduct(UUID jastiperId, ProductCreateRequest request);
     Optional<ProductResponse> updateProduct(UUID jastiperId, UUID id, ProductUpdateRequest request);
     boolean deleteProduct(UUID jastiperId, UUID id);
+    Optional<ProductResponse> getMyProductDetail(UUID id, UUID jastiperId);
 }
