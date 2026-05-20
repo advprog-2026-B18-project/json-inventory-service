@@ -39,6 +39,7 @@ public class SecurityConfig {
                 .requestMatchers("/error").permitAll()
                 .requestMatchers("/internal/**").permitAll()
                 .requestMatchers("/products/internal/**").permitAll()
+                .requestMatchers("/api/products/images/**").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(internalApiKeyFilter, UsernamePasswordAuthenticationFilter.class)
