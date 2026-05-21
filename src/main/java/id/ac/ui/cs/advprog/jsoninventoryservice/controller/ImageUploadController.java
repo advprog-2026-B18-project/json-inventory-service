@@ -13,7 +13,7 @@ import java.io.IOException;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/internal/products/images")
+@RequestMapping("/api/products/images")
 @RequiredArgsConstructor
 public class ImageUploadController {
 

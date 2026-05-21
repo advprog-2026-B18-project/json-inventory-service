@@ -25,10 +25,10 @@ public class AdminProductController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<Map<String, Object>>> getAllProductsAdmin(
-        @RequestParam(required = false) String q,
-           @RequestParam(required = false) UUID jastiperId,
-           @RequestParam(required = false) String status,
-           @RequestParam(required = false) Integer categoryId,
+           @RequestParam(name = "q", required = false) String q,
+           @RequestParam(name = "jastiperId", required = false) UUID jastiperId,
+           @RequestParam(name = "status", required = false) String status,
+           @RequestParam(name = "categoryId", required = false) Integer categoryId,
            Pageable pageable) {
 
         Page<ProductResponse> productPage = adminService.getAllProductsAdmin(q, jastiperId, status, categoryId, pageable);

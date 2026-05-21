@@ -40,7 +40,7 @@ public class ProductController {
     @PreAuthorize("hasRole('JASTIPER')")
     @PostMapping
     public ResponseEntity<ApiResponse<ProductResponse>> createProduct(
-            @RequestAttribute("jastiperId") UUID jastiperId,
+            @RequestAttribute(name = "jastiperId") UUID jastiperId,
             @Valid @RequestBody ProductCreateRequest request) {
         return ResponseUtil.created(productService.createProduct(jastiperId, request), "Product created successfully.");
     }
@@ -48,7 +48,7 @@ public class ProductController {
     @PreAuthorize("hasRole('JASTIPER')")
     @PatchMapping("/{id}")
     public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
-            @RequestAttribute("jastiperId") UUID jastiperId,
+            @RequestAttribute(name = "jastiperId") UUID jastiperId,
             @PathVariable("id") UUID id,
             @Valid @RequestBody ProductUpdateRequest request) {
         return productService.updateProduct(jastiperId, id, request)
@@ -59,7 +59,7 @@ public class ProductController {
     @PreAuthorize("hasRole('JASTIPER')")
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteProduct(
-            @RequestAttribute("jastiperId") UUID jastiperId,
+            @RequestAttribute(name = "jastiperId") UUID jastiperId,
             @PathVariable("id") UUID id) {
         productService.deleteProduct(jastiperId, id);
         return ResponseUtil.success(null, "Product deleted successfully.");
@@ -67,19 +67,18 @@ public class ProductController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<Map<String, Object>>> searchProducts(
-            @RequestParam(required = false) String q,
-            @RequestParam(required = false, name = "jastiper_id") UUID jastiperId,
-            @RequestParam(required = false, name = "min_price") Long minPrice,
-            @RequestParam(required = false, name = "max_price") Long maxPrice,
-            @RequestParam(required = false, name = "category_id") Integer categoryId,
-            @RequestParam(required = false, name = "origin_country") String originCountry,
-            @RequestParam(required = false, name = "purchase_date_from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
-            @RequestParam(required = false, name = "purchase_date_to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
-            @RequestParam(required = false) String mode,
-            @RequestParam(required = false, defaultValue = "1") int page,
-            @RequestParam(required = false, defaultValue = "20") int limit,
-            @RequestParam(required = false, defaultValue = "created_at") String sortBy,
-            @RequestParam(required = false, defaultValue = "desc") String order) {
+            @RequestParam(name = "q", required = false) String q,
+            @RequestParam(name = "jastiper_id", required = false) UUID jastiperId,
+            @RequestParam(name = "min_price", required = false) Long minPrice,
+            @RequestParam(name = "max_price", required = false) Long maxPrice,
+            @RequestParam(name = "category_id", required = false) Integer categoryId,
+            @RequestParam(name = "origin_country", required = false) String originCountry,
+            @RequestParam(name = "purchase_date_from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+            @RequestParam(name = "purchase_date_to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+            @RequestParam(name = "mode", required = false) String mode,
+            @RequestParam(name = "sortBy", required = false, defaultValue = "created_at") String sortBy,
+            @RequestParam(name = "order", required = false, defaultValue = "desc") String order,
+            Pageable pageable) {
 
         String sortProperty;
         if ("created_at".equals(sortBy)) {
@@ -92,20 +91,15 @@ public class ProductController {
             sortProperty = sortBy;
         }
 
-        Sort sort;
-        if ("asc".equalsIgnoreCase(order)) {
-            sort = Sort.by(sortProperty).ascending();
-        } else {
-            sort = Sort.by(sortProperty).descending();
-        }
-        Pageable pageable = PageRequest.of(page - 1, limit, sort);
+        Sort sort = "asc".equalsIgnoreCase(order) ? Sort.by(sortProperty).ascending() : Sort.by(sortProperty).descending();
+        Pageable finalPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
 
         ShoppingMode filterMode = null;
         if (mode != null && !mode.trim().isEmpty()) {
             try {
                 filterMode = ShoppingMode.valueOf(mode.toUpperCase());
             } catch (IllegalArgumentException e) {
-                return ResponseUtil.success(buildPaginationMap(Page.empty(pageable)), "Search results fetched.");
+                return ResponseUtil.success(buildPaginationMap(Page.empty(finalPageable)), "Search results fetched.");
             }
         }
 
@@ -121,16 +115,16 @@ public class ProductController {
                 .mode(filterMode)
                 .build();
 
-        Page<ProductResponse> productPage = productService.searchProductsPublic(criteria, pageable);
+        Page<ProductResponse> productPage = productService.searchProductsPublic(criteria, finalPageable);
         return ResponseUtil.success(buildPaginationMap(productPage), "Search results fetched.");
     }
 
     @PreAuthorize("hasRole('JASTIPER')")
     @GetMapping("/my")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getMyCatalog(
-            @RequestAttribute("jastiperId") UUID jastiperId,
-            @RequestParam(required = false, name = "search") String q,
-            @RequestParam(required = false) String status,
+            @RequestAttribute(name = "jastiperId") UUID jastiperId,
+            @RequestParam(name = "search", required = false) String q,
+            @RequestParam(name = "status", required = false) String status,
             Pageable pageable) {
 
         ProductStatus filterStatus = null;
@@ -155,15 +149,14 @@ public class ProductController {
     @PreAuthorize("hasRole('JASTIPER')")
     @GetMapping("/my/{id}")
     public ResponseEntity<ApiResponse<ProductResponse>> getMyProductDetail(
-            @RequestAttribute("jastiperId") UUID jastiperId,
+            @RequestAttribute(name = "jastiperId") UUID jastiperId,
             @PathVariable("id") UUID id) {
 
-        return productService.getProductById(id)
-                .filter(p -> p.getJastiper() != null && p.getJastiper().getUserId().equals(jastiperId))
+        return productService.getMyProductDetail(id, jastiperId)
                 .map(res -> ResponseUtil.success(res, "My product detail fetched."))
                 .orElse(ResponseUtil.notFound("Product not found or does not belong to you."));
+                
     }
-
     private Map<String, Object> buildPaginationMap(Page<ProductResponse> productPage) {
         Map<String, Object> responseData = new HashMap<>();
         responseData.put("data", productPage.getContent());

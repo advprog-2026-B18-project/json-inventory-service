@@ -1,6 +1,7 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.service;
 
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -20,14 +21,20 @@ public class S3StorageServiceImpl implements StorageService {
     @Value("${aws.s3.bucket-name:none}")
     private String bucketName;
 
+    @Value("${aws.s3.folder-prefix:}")
+    private String folderPrefix;
+
+    @Value("${aws.s3.region:us-east-1}")
+    private String region;
+
     @Override
     public String uploadFile(MultipartFile file) throws IOException {
         String originalFilename = file.getOriginalFilename();
         String extension = (originalFilename != null && originalFilename.contains("."))
                 ? originalFilename.substring(originalFilename.lastIndexOf("."))
                 : "";
-
-        String uniqueFileName = UUID.randomUUID().toString() + extension;
+        
+        String uniqueFileName = folderPrefix + UUID.randomUUID().toString() + extension;
 
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                 .bucket(bucketName)

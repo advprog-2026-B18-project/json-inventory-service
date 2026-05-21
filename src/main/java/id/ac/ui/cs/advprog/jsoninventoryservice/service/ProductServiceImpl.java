@@ -118,7 +118,8 @@ public class ProductServiceImpl implements ProductService {
     }
 
     private ProductResponse mapToThumbnailResponse(Product p) {
-        ProductResponse res = ProductResponse.fromEntity(p);
+        ProductResponse res = enrichProductResponse(p); 
+        
         if (res.getImages() != null && !res.getImages().isEmpty()) {
             res.setImages(List.of(res.getImages().getFirst()));
         }
@@ -256,5 +257,13 @@ public class ProductServiceImpl implements ProductService {
         if (start.isAfter(end)) {
             throw new IllegalArgumentException("The Flash Sale start date cannot exceed the end date!");
         }
+    }
+
+    @Override
+    public Optional<ProductResponse> getMyProductDetail(UUID id, UUID jastiperId) {
+        return productRepository.findById(id)
+                .filter(product -> product.getDeletedAt() == null)
+                .filter(product -> product.getJastiperId().equals(jastiperId))
+                .map(this::enrichProductResponse);
     }
 }

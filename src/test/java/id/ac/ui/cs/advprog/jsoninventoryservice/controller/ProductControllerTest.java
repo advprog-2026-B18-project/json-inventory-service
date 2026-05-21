@@ -1,40 +1,45 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.controller;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductCreateRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.ProductUpdateRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.ProductResponse;
 import id.ac.ui.cs.advprog.jsoninventoryservice.exception.ActiveOrderException;
 import id.ac.ui.cs.advprog.jsoninventoryservice.security.JwtUtil;
 import id.ac.ui.cs.advprog.jsoninventoryservice.service.ProductService;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.http.MediaType;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
-import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
-
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(ProductController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -182,7 +187,7 @@ class ProductControllerTest {
 
     @Test
     void testGetMyProductDetail_Success() throws Exception {
-        when(productService.getProductById(productId)).thenReturn(Optional.of(dummyResponse));
+        when(productService.getMyProductDetail(productId, jastiperId)).thenReturn(Optional.of(dummyResponse));
 
         mockMvc.perform(get("/products/my/" + productId)
                         .requestAttr("jastiperId", jastiperId))
@@ -192,8 +197,7 @@ class ProductControllerTest {
 
     @Test
     void testGetMyProductDetail_UnauthorizedOrNotFound() throws Exception {
-        ProductResponse wrongOwnerResponse = new ProductResponse();
-        when(productService.getProductById(productId)).thenReturn(Optional.of(wrongOwnerResponse));
+        when(productService.getMyProductDetail(productId, jastiperId)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/products/my/" + productId)
                         .requestAttr("jastiperId", jastiperId))
@@ -222,48 +226,6 @@ class ProductControllerTest {
                         .requestAttr("jastiperId", jastiperId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    @WithMockUser(roles = "JASTIPER")
-    void testGetMyProductDetail_NullJastiperInfo() throws Exception {
-        ProductResponse noJastiperResponse = new ProductResponse();
-        noJastiperResponse.setProductId(productId);
-        noJastiperResponse.setJastiper(null);
-
-        when(productService.getProductById(productId)).thenReturn(Optional.of(noJastiperResponse));
-
-        mockMvc.perform(get("/products/my/" + productId)
-                        .requestAttr("jastiperId", jastiperId))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    @WithMockUser(roles = "JASTIPER")
-    void testGetMyProductDetail_NullJastiperObject() throws Exception {
-        ProductResponse responseWithNullJastiper = new ProductResponse();
-        responseWithNullJastiper.setProductId(productId);
-        responseWithNullJastiper.setJastiper(null);
-
-        when(productService.getProductById(productId)).thenReturn(Optional.of(responseWithNullJastiper));
-
-        mockMvc.perform(get("/products/my/" + productId)
-                        .requestAttr("jastiperId", jastiperId))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    @WithMockUser(roles = "JASTIPER")
-    void testGetMyProductDetail_WrongJastiperId_Branch() throws Exception {
-        ProductResponse wrongOwnerResponse = new ProductResponse();
-        wrongOwnerResponse.setProductId(productId);
-        wrongOwnerResponse.setJastiper(ProductResponse.JastiperInfo.builder().userId(UUID.randomUUID()).build());
-
-        when(productService.getProductById(productId)).thenReturn(Optional.of(wrongOwnerResponse));
-
-        mockMvc.perform(get("/products/my/" + productId)
-                        .requestAttr("jastiperId", jastiperId))
                 .andExpect(status().isNotFound());
     }
 
@@ -368,5 +330,16 @@ class ProductControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.data").isEmpty());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"null_info", "null_object", "wrong_id"})
+    @WithMockUser(roles = "JASTIPER")
+    void testGetMyProductDetail_NotFoundScenarios(String scenario) throws Exception {
+        when(productService.getMyProductDetail(productId, jastiperId)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/products/my/" + productId)
+                        .requestAttr("jastiperId", jastiperId))
+                .andExpect(status().isNotFound());
     }
 }
