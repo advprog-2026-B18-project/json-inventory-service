@@ -1,11 +1,16 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.config;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
-import software.amazon.awssdk.services.s3.S3Client;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import software.amazon.awssdk.services.s3.S3Client;
 
 class S3ConfigTest {
 
@@ -19,39 +24,22 @@ class S3ConfigTest {
         ReflectionTestUtils.setField(s3Config, "region", "eu-west-1");
     }
 
-    @Test
-    void testS3ClientWithSessionTokenNoneAndNoEndpoint() {
-        ReflectionTestUtils.setField(s3Config, "sessionToken", "none");
-        ReflectionTestUtils.setField(s3Config, "endpointOverride", "");
+    @ParameterizedTest
+    @MethodSource("provideS3ConfigTestData")
+    void testS3ClientConfigurations(String sessionToken, String endpointOverride) {
+        ReflectionTestUtils.setField(s3Config, "sessionToken", sessionToken);
+        ReflectionTestUtils.setField(s3Config, "endpointOverride", endpointOverride);
 
         S3Client client = s3Config.s3Client();
         assertNotNull(client);
     }
 
-    @Test
-    void testS3ClientWithNullSessionTokenAndNullEndpoint() {
-        ReflectionTestUtils.setField(s3Config, "sessionToken", null);
-        ReflectionTestUtils.setField(s3Config, "endpointOverride", null);
-
-        S3Client client = s3Config.s3Client();
-        assertNotNull(client);
-    }
-
-    @Test
-    void testS3ClientWithEmptySessionTokenAndEmptyEndpoint() {
-        ReflectionTestUtils.setField(s3Config, "sessionToken", "   ");
-        ReflectionTestUtils.setField(s3Config, "endpointOverride", "   ");
-
-        S3Client client = s3Config.s3Client();
-        assertNotNull(client);
-    }
-
-    @Test
-    void testS3ClientWithValidSessionTokenAndValidEndpoint() {
-        ReflectionTestUtils.setField(s3Config, "sessionToken", "valid-long-session-token-12345");
-        ReflectionTestUtils.setField(s3Config, "endpointOverride", "http://localhost:4566");
-
-        S3Client client = s3Config.s3Client();
-        assertNotNull(client);
+    private static Stream<Arguments> provideS3ConfigTestData() {
+        return Stream.of(
+            arguments("none", ""),
+            arguments(null, null),
+            arguments("   ", "   "),
+            arguments("valid-long-session-token-12345", "http://localhost:4566")
+        );
     }
 }
