@@ -241,7 +241,7 @@ class AdminProductServiceImplTest {
     }
 
     @Test
-    void testEnrichProductResponse_WithCategoryAndCompleteProfile() throws Exception {
+    void testEnrichProductResponse_WithCategoryAndCompleteProfile() {
         String keyword = "test";
         Pageable pageable = PageRequest.of(0, 10);
         UUID mockJastiperId = UUID.randomUUID();
@@ -282,7 +282,7 @@ class AdminProductServiceImplTest {
     }
 
     @Test
-    void testEnrichProductResponse_AuthServiceThrowsException_HitsCatchBlock() throws Exception {
+    void testEnrichProductResponse_AuthServiceThrowsException_HitsCatchBlock() {
         String keyword = "test";
         Pageable pageable = PageRequest.of(0, 10);
         UUID mockJastiperId = UUID.randomUUID();
@@ -393,7 +393,7 @@ class AdminProductServiceImplTest {
     }
 
     @Test
-    void testEnrichProductResponse_CategoryAndJastiperAlreadyNonNull_CoverFalseBranches() throws Exception {
+    void testEnrichProductResponse_CategoryAndJastiperAlreadyNonNull_CoverFalseBranches() {
         String keyword = "test";
         Pageable pageable = PageRequest.of(0, 10);
         UUID mockJastiperId = UUID.randomUUID();
