@@ -44,22 +44,24 @@ public class StockManagementServiceImpl implements StockManagementService {
                     .build());
         }
 
-        return productRepository.findByIdForUpdate(productId).flatMap(p -> {
+        return productRepository.findById(productId).flatMap(p -> {
             ShoppingModeStrategy strategy = shoppingModeProvider.getStrategy(p.getMode());
 
             if (!strategy.isEligibleForReservation(p, req.getQuantity())) {
                 return Optional.empty();
             }
 
-            if (p.getStock() < req.getQuantity()) {
+            int updatedRows = productRepository.reserveStockAtomic(productId, req.getQuantity());
+
+            if (updatedRows == 0) {
                 throw new StockOperationException("Insufficient stock!", 404);
             }
 
             p.setStock(p.getStock() - req.getQuantity());
             if (p.getStock() == 0) {
                 p.setStatus(ProductStatus.OUT_OF_STOCK);
+                productRepository.updateStatusAtomic(productId, ProductStatus.OUT_OF_STOCK);
             }
-            productRepository.save(p);
 
             StockReservation res = StockReservation.builder()
                     .product(p)
@@ -86,17 +88,18 @@ public class StockManagementServiceImpl implements StockManagementService {
 
         if (optRes.isPresent() && optRes.get().getStatus() != ReservationStatus.RELEASED) {
             StockReservation res = optRes.get();
-            Product p = productRepository.findByIdForUpdate(id).orElseThrow();
+            Product p = productRepository.findById(id).orElseThrow();
+
+            productRepository.releaseStockAtomic(id, res.getQuantity());
 
             p.setStock(p.getStock() + res.getQuantity());
-
             if (p.getStatus() == ProductStatus.OUT_OF_STOCK && p.getStock() > 0) {
                 p.setStatus(ProductStatus.ACTIVE);
+                productRepository.updateStatusAtomic(id, ProductStatus.ACTIVE);
             }
 
             res.setStatus(ReservationStatus.RELEASED);
             reservationRepository.save(res);
-            productRepository.save(p);
 
             return Optional.of(ProductResponse.fromEntity(p));
         }
@@ -106,7 +109,7 @@ public class StockManagementServiceImpl implements StockManagementService {
     @Override
     @Transactional
     public Optional<ProductResponse> processPostOrder(UUID productId, PostOrderRequest req) {
-        Product p = productRepository.findByIdForUpdate(productId).orElse(null);
+        Product p = productRepository.findById(productId).orElse(null);
         if (p == null) {
             return Optional.empty();
         }
