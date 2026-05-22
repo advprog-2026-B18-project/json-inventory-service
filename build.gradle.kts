@@ -44,6 +44,8 @@ dependencies {
     implementation("software.amazon.awssdk:s3:2.25.11")
 
     // Compile Only & Annotation Processors
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("io.micrometer:micrometer-registry-prometheus")
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
     annotationProcessor("org.projectlombok:lombok")
