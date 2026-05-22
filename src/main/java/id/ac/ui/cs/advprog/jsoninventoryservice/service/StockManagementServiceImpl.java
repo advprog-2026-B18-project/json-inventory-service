@@ -5,6 +5,7 @@ import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.StockReleaseRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.StockReserveRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.ProductResponse;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.StockOperationResponse;
+import id.ac.ui.cs.advprog.jsoninventoryservice.exception.StockOperationException;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.Product;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.StockReservation;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
@@ -28,19 +29,13 @@ public class StockManagementServiceImpl implements StockManagementService {
     private final StockReservationRepository reservationRepository;
     private final ShoppingModeProvider shoppingModeProvider;
 
-    private ProductResponse mapToResponseSafe(Product p) {
-        if (p.getImages() != null) p.getImages().size();
-        if (p.getTags() != null) p.getTags().size();
-        return ProductResponse.fromEntity(p);
-    }
-
     @Override
     @Transactional
     public Optional<StockOperationResponse> reserveStock(UUID productId, StockReserveRequest req) {
         Optional<StockReservation> existing = reservationRepository.findByOrderIdAndProduct_ProductId(req.getOrderId(), productId);
 
         if (existing.isPresent() && existing.get().getStatus() != ReservationStatus.RELEASED) {
-            return productRepository.findByIdForUpdate(productId).map(p -> StockOperationResponse.builder()
+            return productRepository.findById(productId).map(p -> StockOperationResponse.builder()
                     .productId(p.getProductId())
                     .reservedQuantity(existing.get().getQuantity())
                     .remainingStock(p.getStock())
@@ -49,19 +44,21 @@ public class StockManagementServiceImpl implements StockManagementService {
                     .build());
         }
 
-        return productRepository.findByIdForUpdate(productId).map(p -> {
+        return productRepository.findByIdForUpdate(productId).flatMap(p -> {
             ShoppingModeStrategy strategy = shoppingModeProvider.getStrategy(p.getMode());
 
             if (!strategy.isEligibleForReservation(p, req.getQuantity())) {
-                return null;
+                return Optional.empty();
+            }
+
+            if (p.getStock() < req.getQuantity()) {
+                throw new StockOperationException("Insufficient stock!", 404);
             }
 
             p.setStock(p.getStock() - req.getQuantity());
-
             if (p.getStock() == 0) {
                 p.setStatus(ProductStatus.OUT_OF_STOCK);
             }
-
             productRepository.save(p);
 
             StockReservation res = StockReservation.builder()
@@ -72,13 +69,13 @@ public class StockManagementServiceImpl implements StockManagementService {
                     .build();
             res = reservationRepository.save(res);
 
-            return StockOperationResponse.builder()
+            return Optional.of(StockOperationResponse.builder()
                     .productId(p.getProductId())
                     .reservedQuantity(res.getQuantity())
                     .remainingStock(p.getStock())
                     .reservationId(res.getReservationId())
                     .status("RESERVED")
-                    .build();
+                    .build());
         });
     }
 
@@ -92,67 +89,83 @@ public class StockManagementServiceImpl implements StockManagementService {
             Product p = productRepository.findByIdForUpdate(id).orElseThrow();
 
             p.setStock(p.getStock() + res.getQuantity());
+
             if (p.getStatus() == ProductStatus.OUT_OF_STOCK && p.getStock() > 0) {
                 p.setStatus(ProductStatus.ACTIVE);
             }
 
-            productRepository.save(p);
             res.setStatus(ReservationStatus.RELEASED);
             reservationRepository.save(res);
+            productRepository.save(p);
 
-            return Optional.of(mapToResponseSafe(p));
+            return Optional.of(ProductResponse.fromEntity(p));
         }
         return Optional.empty();
     }
 
     @Override
     @Transactional
-    public Optional<ProductResponse> processPostOrder(UUID id, PostOrderRequest request) {
-        Optional<Product> optProduct = productRepository.findByIdForUpdate(id);
-        if (optProduct.isEmpty()) return Optional.empty();
-        Product product = optProduct.get();
-        Optional<StockReservation> optRes = reservationRepository.findByOrderIdAndProduct_ProductId(request.getOrderId(), id);
-
-        if ("CONFIRM".equalsIgnoreCase(request.getAction())) {
-            handleConfirmAction(product, request, optRes);
-        } else if ("CANCEL".equalsIgnoreCase(request.getAction())) {
-            handleCancelAction(product, request, optRes);
-        } else {
-            throw new IllegalArgumentException("Invalid action. Must be 'CONFIRM' or 'CANCEL'.");
+    public Optional<ProductResponse> processPostOrder(UUID productId, PostOrderRequest req) {
+        Product p = productRepository.findByIdForUpdate(productId).orElse(null);
+        if (p == null) {
+            return Optional.empty();
         }
-        productRepository.save(product);
 
-        return Optional.of(mapToResponseSafe(product));
+        String action = req.getAction();
+        if (action == null || (!action.equals("CONFIRM") && !action.equals("CANCEL"))) {
+            throw new IllegalArgumentException("Invalid action");
+        }
+
+        Optional<StockReservation> optRes = reservationRepository.findByOrderIdAndProduct_ProductId(req.getOrderId(), productId);
+
+        if (action.equals("CONFIRM")) {
+            handleConfirmAction(p, optRes, req);
+        } else {
+            handleCancelAction(p, optRes);
+        }
+
+        return Optional.of(ProductResponse.fromEntity(p));
     }
 
-    private void handleConfirmAction(Product product, PostOrderRequest request, Optional<StockReservation> optRes) {
+    private void handleConfirmAction(Product p, Optional<StockReservation> optRes, PostOrderRequest req) {
         if (optRes.isPresent() && optRes.get().getStatus() == ReservationStatus.PENDING) {
             StockReservation res = optRes.get();
             res.setStatus(ReservationStatus.CONFIRMED);
             reservationRepository.save(res);
-            int currentTotalOrders = product.getTotalOrders() != null ? product.getTotalOrders() : 0;
-            product.setTotalOrders(currentTotalOrders + 1);
+
+            int currentOrders = p.getTotalOrders() != null ? p.getTotalOrders() : 0;
+            p.setTotalOrders(currentOrders + 1);
         }
 
-        if (request.getRating() != null && request.getRating() >= 1.0 && request.getRating() <= 5.0) {
-            int currentReviews = product.getTotalReviews() != null ? product.getTotalReviews() : 0;
-            float currentAvg = product.getAvgRating() != null ? product.getAvgRating() : 0.0f;
-            float newAvg = ((currentAvg * currentReviews) + request.getRating().floatValue()) / (currentReviews + 1);
-            product.setTotalReviews(currentReviews + 1);
-            product.setAvgRating(newAvg);
+        if (req.getRating() != null && req.getRating() >= 1.0 && req.getRating() <= 5.0) {
+            calculateNewRating(p, req.getRating().floatValue());
         }
+
+        productRepository.save(p);
     }
 
-    private void handleCancelAction(Product product, PostOrderRequest request, Optional<StockReservation> optRes) {
-        if (optRes.isPresent() && optRes.get().getStatus() != ReservationStatus.RELEASED) {
-            StockReservation res = optRes.get();
+    private void calculateNewRating(Product p, float incomingRating) {
+        int currentReviews = p.getTotalReviews() != null ? p.getTotalReviews() : 0;
+        float currentAvg = p.getAvgRating() != null ? p.getAvgRating() : 0.0f;
 
-            product.setStock(product.getStock() + res.getQuantity());
-            if (product.getStatus() == ProductStatus.OUT_OF_STOCK && product.getStock() > 0) {
-                product.setStatus(ProductStatus.ACTIVE);
-            }
+        float totalRatingSum = (currentAvg * currentReviews) + incomingRating;
+        int newReviews = currentReviews + 1;
+
+        p.setTotalReviews(newReviews);
+        p.setAvgRating(totalRatingSum / newReviews);
+    }
+
+    private void handleCancelAction(Product p, Optional<StockReservation> optRes) {
+        if (optRes.isPresent() && optRes.get().getStatus() == ReservationStatus.PENDING) {
+            StockReservation res = optRes.get();
             res.setStatus(ReservationStatus.RELEASED);
             reservationRepository.save(res);
+
+            p.setStock(p.getStock() + res.getQuantity());
+            if (p.getStatus() == ProductStatus.OUT_OF_STOCK && p.getStock() > 0) {
+                p.setStatus(ProductStatus.ACTIVE);
+            }
+            productRepository.save(p);
         }
     }
 }

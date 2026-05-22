@@ -3,6 +3,7 @@ package id.ac.ui.cs.advprog.jsoninventoryservice.strategy;
 import id.ac.ui.cs.advprog.jsoninventoryservice.exception.StockOperationException;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.Product;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
+import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ShoppingMode;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -17,7 +18,6 @@ public class FlashSaleStrategy implements ShoppingModeStrategy {
         if (product.getStock() < quantity) {
             throw new StockOperationException("Insufficient stock of Flash Sale items.", 400);
         }
-
         if (product.getFlashSaleStart() == null || product.getFlashSaleEnd() == null) {
             throw new StockOperationException("Invalid Flash Sale configuration.", 400);
         }
@@ -29,7 +29,11 @@ public class FlashSaleStrategy implements ShoppingModeStrategy {
         if (now.isAfter(product.getFlashSaleEnd())) {
             throw new StockOperationException("The flash sale is over.", 400);
         }
-
         return true;
+    }
+
+    @Override
+    public ShoppingMode getSupportedMode() {
+        return ShoppingMode.FLASH_SALE;
     }
 }

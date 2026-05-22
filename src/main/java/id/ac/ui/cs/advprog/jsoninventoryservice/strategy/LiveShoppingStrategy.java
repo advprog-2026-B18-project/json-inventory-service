@@ -3,6 +3,7 @@ package id.ac.ui.cs.advprog.jsoninventoryservice.strategy;
 import id.ac.ui.cs.advprog.jsoninventoryservice.exception.StockOperationException;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.Product;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
+import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ShoppingMode;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -16,7 +17,11 @@ public class LiveShoppingStrategy implements ShoppingModeStrategy {
         if (product.getStock() < quantity) {
             throw new StockOperationException("Insufficient stock.", 400);
         }
-
         return true;
+    }
+
+    @Override
+    public ShoppingMode getSupportedMode() {
+        return ShoppingMode.LIVE;
     }
 }

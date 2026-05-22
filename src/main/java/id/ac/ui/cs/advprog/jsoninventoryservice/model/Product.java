@@ -105,8 +105,7 @@ public class Product {
     private LocalDateTime updatedAt;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
-    @Builder.Default
+    @Column(name = "\"mode\"", nullable = false, length = 30)    @Builder.Default
     private ShoppingMode mode = ShoppingMode.LIVE;
 
     @Column(name = "flash_sale_start")

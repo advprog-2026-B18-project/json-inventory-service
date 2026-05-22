@@ -1,23 +1,25 @@
 package id.ac.ui.cs.advprog.jsoninventoryservice.strategy;
 
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ShoppingMode;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Component
-@RequiredArgsConstructor
 public class ShoppingModeProvider {
-    private final LiveShoppingStrategy liveShoppingStrategy;
-    private final PreOrderStrategy preOrderStrategy;
-    private final FlashSaleStrategy flashSaleStrategy;
+    private final Map<ShoppingMode, ShoppingModeStrategy> strategyMap;
+    private final LiveShoppingStrategy defaultStrategy;
+
+    public ShoppingModeProvider(List<ShoppingModeStrategy> strategies, LiveShoppingStrategy defaultStrategy) {
+        this.strategyMap = strategies.stream()
+                .collect(Collectors.toMap(ShoppingModeStrategy::getSupportedMode, Function.identity()));
+        this.defaultStrategy = defaultStrategy;
+    }
 
     public ShoppingModeStrategy getStrategy(ShoppingMode mode) {
-        if (mode == null) return liveShoppingStrategy;
-
-        return switch (mode) {
-            case LIVE -> liveShoppingStrategy;
-            case PRE_ORDER -> preOrderStrategy;
-            case FLASH_SALE -> flashSaleStrategy;
-        };
+        if (mode == null) return defaultStrategy;
+        return strategyMap.getOrDefault(mode, defaultStrategy);
     }
 }

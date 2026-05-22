@@ -5,6 +5,7 @@ import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.StockReleaseRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.StockReserveRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.ProductResponse;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.StockOperationResponse;
+import id.ac.ui.cs.advprog.jsoninventoryservice.exception.StockOperationException;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.Product;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.StockReservation;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
@@ -16,11 +17,14 @@ import id.ac.ui.cs.advprog.jsoninventoryservice.strategy.ShoppingModeStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -59,6 +63,8 @@ class StockManagementServiceImplTest {
         product.setAvgRating(0.0f);
         product.setTotalOrders(0);
         product.setTotalReviews(0);
+        product.setImages(List.of("image1.jpg"));
+        product.setTags(List.of("tag1"));
     }
 
     private void setupShoppingModeMock(boolean isEligible) {
@@ -77,7 +83,7 @@ class StockManagementServiceImplTest {
         existingRes.setQuantity(2);
 
         when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(existingRes));
-        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
 
         Optional<StockOperationResponse> res = stockService.reserveStock(productId, req);
         assertTrue(res.isPresent());
@@ -138,7 +144,7 @@ class StockManagementServiceImplTest {
         resMock.setQuantity(2);
 
         when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(resMock));
-        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
 
         Optional<StockOperationResponse> result = stockService.reserveStock(productId, req);
         assertTrue(result.isPresent());
@@ -189,10 +195,9 @@ class StockManagementServiceImplTest {
 
         when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.empty());
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
-        setupShoppingModeMock(false);
+        setupShoppingModeMock(true);
 
-        Optional<StockOperationResponse> res = stockService.reserveStock(productId, req);
-        assertFalse(res.isPresent());
+        assertThrows(StockOperationException.class, () -> stockService.reserveStock(productId, req));
     }
 
     @Test
@@ -335,17 +340,18 @@ class StockManagementServiceImplTest {
     }
 
     @Test
-    void processPostOrder_Fail_InvalidAction() {
+    void processPostOrder_Fail_InvalidActionString_ThrowsException() {
         PostOrderRequest req = new PostOrderRequest();
         req.setOrderId(orderId);
-        req.setAction("INVALID_ACTION");
+        req.setAction("INVALID");
 
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
-        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.empty());
 
-        assertThrows(IllegalArgumentException.class, () -> {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
             stockService.processPostOrder(productId, req);
         });
+
+        assertEquals("Invalid action", exception.getMessage());
     }
 
     @Test
@@ -369,18 +375,6 @@ class StockManagementServiceImplTest {
         PostOrderRequest req = new PostOrderRequest();
         req.setOrderId(orderId);
         req.setAction("CONFIRM");
-
-        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
-        stockService.processPostOrder(productId, req);
-        assertEquals(0.0f, product.getAvgRating());
-    }
-
-    @Test
-    void processPostOrder_Confirm_RatingOutOfBounds() {
-        PostOrderRequest req = new PostOrderRequest();
-        req.setOrderId(orderId);
-        req.setAction("CONFIRM");
-        req.setRating(6.0);
 
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
         stockService.processPostOrder(productId, req);
@@ -494,23 +488,14 @@ class StockManagementServiceImplTest {
         assertEquals(ProductStatus.OUT_OF_STOCK, product.getStatus());
     }
 
-    @Test
-    void processPostOrder_Confirm_RatingTooLow_Branch() {
+    @ParameterizedTest
+    @ValueSource(doubles = {6.0, 0.5, 5.5})
+    void processPostOrder_Confirm_RatingOutOfBounds_Parameterized(Double invalidRating) {
         PostOrderRequest req = new PostOrderRequest();
         req.setOrderId(orderId);
         req.setAction("CONFIRM");
-        req.setRating(0.5);
-        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
-        stockService.processPostOrder(productId, req);
-        assertEquals(0.0f, product.getAvgRating());
-    }
+        req.setRating(invalidRating);
 
-    @Test
-    void processPostOrder_Confirm_RatingTooHigh_Branch() {
-        PostOrderRequest req = new PostOrderRequest();
-        req.setOrderId(orderId);
-        req.setAction("CONFIRM");
-        req.setRating(5.5);
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
         stockService.processPostOrder(productId, req);
         assertEquals(0.0f, product.getAvgRating());
@@ -585,6 +570,7 @@ class StockManagementServiceImplTest {
         req.setOrderId(orderId);
         req.setAction("CONFIRM");
         StockReservation res = new StockReservation();
+        res.setStatus(ReservationStatus.PENDING);
         product.setTotalOrders(null);
 
         when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(res));
@@ -612,5 +598,36 @@ class StockManagementServiceImplTest {
 
         Optional<ProductResponse> response = stockService.releaseStock(productId, req);
         assertTrue(response.isPresent());
+    }
+
+    @Test
+    void reserveStock_Fail_InsufficientStock_ThrowsException() {
+        product.setStock(1);
+        StockReserveRequest req = new StockReserveRequest();
+        req.setOrderId(orderId);
+        req.setQuantity(5);
+
+        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.empty());
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+        setupShoppingModeMock(true);
+
+        assertThrows(StockOperationException.class, () -> stockService.reserveStock(productId, req));
+    }
+
+    @Test
+    void reserveStock_ExistingPresent_ButProductNotFound() {
+        StockReserveRequest req = new StockReserveRequest();
+        req.setOrderId(orderId);
+        req.setQuantity(2);
+        StockReservation existingRes = new StockReservation();
+        existingRes.setReservationId(UUID.randomUUID());
+        existingRes.setStatus(ReservationStatus.PENDING);
+        existingRes.setQuantity(2);
+
+        when(reservationRepository.findByOrderIdAndProduct_ProductId(orderId, productId)).thenReturn(Optional.of(existingRes));
+        when(productRepository.findById(productId)).thenReturn(Optional.empty());
+
+        Optional<StockOperationResponse> res = stockService.reserveStock(productId, req);
+        assertFalse(res.isPresent());
     }
 }

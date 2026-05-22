@@ -161,8 +161,10 @@ class ShoppingModeTests {
 
     @Test
     void testFactory_ReturnsCorrectStrategy() {
-        ShoppingModeProvider factory = new ShoppingModeProvider(liveStrategy, preOrderStrategy, flashSaleStrategy);
-
+        ShoppingModeProvider factory = new ShoppingModeProvider(
+                java.util.List.of(liveStrategy, preOrderStrategy, flashSaleStrategy),
+                liveStrategy
+        );
         assertInstanceOf(LiveShoppingStrategy.class, factory.getStrategy(ShoppingMode.LIVE));
         assertInstanceOf(PreOrderStrategy.class, factory.getStrategy(ShoppingMode.PRE_ORDER));
         assertInstanceOf(FlashSaleStrategy.class, factory.getStrategy(ShoppingMode.FLASH_SALE));

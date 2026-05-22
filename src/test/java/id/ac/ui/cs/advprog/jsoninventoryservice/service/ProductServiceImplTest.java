@@ -32,6 +32,8 @@ import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -70,6 +72,8 @@ class ProductServiceImplTest {
                 .originCountry("ID")
                 .purchaseDate(LocalDate.now())
                 .status(ProductStatus.ACTIVE)
+                .images(List.of("image1.jpg"))
+                .tags(List.of("tag1"))
                 .build();
     }
 
@@ -518,11 +522,11 @@ class ProductServiceImplTest {
 
     @Test
     void testGetProductById_Success_WithEnrichment() {
-        productId = UUID.randomUUID();
-        UUID jastiperId = UUID.randomUUID();
+        UUID localProductId = UUID.randomUUID();
+        UUID localJastiperId = UUID.randomUUID();
         Product product = new Product();
-        product.setProductId(productId);
-        product.setJastiperId(jastiperId);
+        product.setProductId(localProductId);
+        product.setJastiperId(localJastiperId);
         product.setCategoryId(1);
         product.setStatus(ProductStatus.ACTIVE);
         product.setPrice(100000);
@@ -534,11 +538,11 @@ class ProductServiceImplTest {
         mockProfile.put("username", "jastiper123");
         mockProfile.put("status", "ACTIVE");
 
-        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+        when(productRepository.findById(localProductId)).thenReturn(Optional.of(product));
         when(categoryRepository.findById(1)).thenReturn(Optional.of(category));
-        when(authIntegrationService.getJastiperProfile(jastiperId)).thenReturn(mockProfile);
+        when(authIntegrationService.getJastiperProfile(localJastiperId)).thenReturn(mockProfile);
 
-        Optional<ProductResponse> result = productService.getProductById(productId);
+        Optional<ProductResponse> result = productService.getProductById(localProductId);
         assertTrue(result.isPresent());
         assertEquals("Electronics", result.get().getCategory().getName());
         assertEquals("jastiper123", result.get().getJastiper().getUsername());
@@ -852,16 +856,16 @@ class ProductServiceImplTest {
 
     @Test
     void testUpdateProduct_WithNullImagesAndTags_Coverage() {
-        UUID productId = UUID.randomUUID();
-        UUID jastiperId = UUID.randomUUID();
+        UUID localProductId = UUID.randomUUID();
+        UUID localJastiperId = UUID.randomUUID();
 
         ProductUpdateRequest updateReq = new ProductUpdateRequest();
         updateReq.setName("New Name");
         updateReq.setPrice(1000L);
 
         Product product = new Product();
-        product.setProductId(productId);
-        product.setJastiperId(jastiperId);
+        product.setProductId(localProductId);
+        product.setJastiperId(localJastiperId);
         product.setName("Old Name");
         product.setDescription("Old Desc");
         product.setStatus(ProductStatus.ACTIVE);
@@ -870,12 +874,12 @@ class ProductServiceImplTest {
         product.setImages(null);
         product.setTags(null);
 
-        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+        when(productRepository.findByIdForUpdate(localProductId)).thenReturn(Optional.of(product));
         when(productRepository.save(any(Product.class))).thenReturn(product);
 
-        Optional<ProductResponse> response = productService.updateProduct(jastiperId, productId, updateReq);
+        Optional<ProductResponse> response = productService.updateProduct(localJastiperId, localProductId, updateReq);
         assertTrue(response.isPresent());
-        verify(productRepository).findByIdForUpdate(productId);
+        verify(productRepository).findByIdForUpdate(localProductId);
         verify(productRepository).save(any(Product.class));
     }
 
@@ -1066,5 +1070,67 @@ class ProductServiceImplTest {
         when(productRepository.save(any(Product.class))).thenReturn(dummyProduct);
 
         assertDoesNotThrow(() -> productService.updateProduct(jastiperId, productId, req));
+    }
+
+    @Test
+    void testGetMyProductDetail_Success() {
+        Product product = Product.builder()
+                .productId(productId)
+                .jastiperId(jastiperId)
+                .name("Product Jastiper")
+                .status(ProductStatus.HIDDEN)
+                .price(100000)
+                .stock(5)
+                .serviceFee(2000)
+                .weightGram(200)
+                .deletedAt(null)
+                .build();
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+
+        Optional<ProductResponse> result = productService.getMyProductDetail(productId, jastiperId);
+
+        assertTrue(result.isPresent());
+        assertEquals("Product Jastiper", result.get().getName());
+    }
+
+    @Test
+    void testGetMyProductDetail_ProductDeleted_ReturnsEmpty() {
+        Product deletedProduct = Product.builder()
+                .productId(productId)
+                .jastiperId(jastiperId)
+                .price(100000)
+                .stock(5)
+                .serviceFee(2000)
+                .weightGram(200)
+                .deletedAt(LocalDateTime.now())
+                .build();
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(deletedProduct));
+
+        Optional<ProductResponse> result = productService.getMyProductDetail(productId, jastiperId);
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void testGetMyProductDetail_WrongJastiperId_ReturnsEmpty() {
+        UUID strangerId = UUID.randomUUID();
+        
+        Product product = Product.builder()
+                .productId(productId)
+                .jastiperId(jastiperId)
+                .price(100000)
+                .stock(5)
+                .serviceFee(2000)
+                .weightGram(200)
+                .deletedAt(null)
+                .build();
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+
+        Optional<ProductResponse> result = productService.getMyProductDetail(productId, strangerId);
+
+        assertTrue(result.isEmpty());
     }
 }
