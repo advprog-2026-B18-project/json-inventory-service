@@ -13,7 +13,7 @@ import java.util.UUID;
 
 @Service
 public class AuthIntegrationServiceImpl implements AuthIntegrationService {
-    @Value("${SERVICE_URL_AUTH:http://localhost:8082}")
+    @Value("${URL_AUTH:http://localhost:8082}")
     private String authServiceUrl;
 
     private final RestTemplate restTemplate;
