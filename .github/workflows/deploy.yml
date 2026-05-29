@@ -71,7 +71,7 @@ jobs:
           echo "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_KEY" >> .env
           echo "AWS_SESSION_TOKEN=$AWS_TOKEN" >> .env
           echo "AWS_S3_BUCKET_NAME=$AWS_BUCKET" >> .env
-          echo "URL_AUTH=$SERVICE_URL_AUTH" >> .env
+          echo "SERVICE_URL_AUTH=$SERVICE_URL_AUTH" >> .env
 
       # Copy docker-compose.yml and the newly generated .env via scp
       - name: Copy files via scp
