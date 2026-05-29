@@ -205,6 +205,10 @@ public class ProductServiceImpl implements ProductService {
     }
 
     private void updateStockAndStatus(Product existing, ProductUpdateRequest req) {
+        if (req.getStatus() != null) {
+            existing.setStatus(ProductStatus.valueOf(req.getStatus().toUpperCase()));
+        }
+
         if (req.getStock() != null) {
             existing.setStock(req.getStock());
             if (existing.getStock() <= 0) {
@@ -212,9 +216,6 @@ public class ProductServiceImpl implements ProductService {
             } else if (existing.getStatus() == ProductStatus.OUT_OF_STOCK) {
                 existing.setStatus(ProductStatus.ACTIVE);
             }
-        }
-        if (req.getStatus() != null) {
-            existing.setStatus(ProductStatus.valueOf(req.getStatus().toUpperCase()));
         }
     }
 
