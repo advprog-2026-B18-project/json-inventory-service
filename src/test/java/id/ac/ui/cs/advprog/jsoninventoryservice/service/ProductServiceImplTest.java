@@ -619,12 +619,15 @@ class ProductServiceImplTest {
         Category c = new Category();
         c.setName("Test Category");
 
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("total_orders", 20);
+
         Map<String, Object> profile = new HashMap<>();
         profile.put("username", "testuser");
         profile.put("full_name", "Test User");
         profile.put("profile_picture_url", "https://image.com");
-        profile.put("avg_rating", 4.5);
-        profile.put("total_orders", 20);
+        profile.put("rating", 4.5);
+        profile.put("stats", stats);
 
         when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
         when(categoryRepository.findById(1)).thenReturn(Optional.of(c));
@@ -633,6 +636,8 @@ class ProductServiceImplTest {
         Optional<ProductResponse> res = productService.getProductById(productId);
         assertTrue(res.isPresent());
         assertNotNull(res.get().getJastiper());
+        assertEquals(4.5, res.get().getJastiper().getAvgRating());
+        assertEquals(20, res.get().getJastiper().getTotalOrders().intValue());
     }
 
     @Test
