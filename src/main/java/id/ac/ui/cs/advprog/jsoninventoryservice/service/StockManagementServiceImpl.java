@@ -29,10 +29,17 @@ public class StockManagementServiceImpl implements StockManagementService {
     private final StockReservationRepository reservationRepository;
     private final ShoppingModeProvider shoppingModeProvider;
 
+    private ProductResponse mapToResponseSafe(Product p) {
+        if (p.getImages() != null) p.getImages().size();
+        if (p.getTags() != null) p.getTags().size();
+        return ProductResponse.fromEntity(p);
+    }
+
     @Override
     @Transactional
     public Optional<StockOperationResponse> reserveStock(UUID productId, StockReserveRequest req) {
-        Optional<StockReservation> existing = reservationRepository.findByOrderIdAndProduct_ProductId(req.getOrderId(), productId);
+        Optional<StockReservation> existing = reservationRepository
+                .findByOrderIdAndProduct_ProductId(req.getOrderId(), productId);
 
         if (existing.isPresent() && existing.get().getStatus() != ReservationStatus.RELEASED) {
             return productRepository.findById(productId).map(p -> StockOperationResponse.builder()
@@ -46,13 +53,11 @@ public class StockManagementServiceImpl implements StockManagementService {
 
         return productRepository.findById(productId).flatMap(p -> {
             ShoppingModeStrategy strategy = shoppingModeProvider.getStrategy(p.getMode());
-
             if (!strategy.isEligibleForReservation(p, req.getQuantity())) {
                 return Optional.empty();
             }
 
             int updatedRows = productRepository.reserveStockAtomic(productId, req.getQuantity());
-
             if (updatedRows == 0) {
                 throw new StockOperationException("Insufficient stock!", 404);
             }
@@ -84,7 +89,8 @@ public class StockManagementServiceImpl implements StockManagementService {
     @Override
     @Transactional
     public Optional<ProductResponse> releaseStock(UUID id, StockReleaseRequest req) {
-        Optional<StockReservation> optRes = reservationRepository.findByOrderIdAndProduct_ProductId(req.getOrderId(), id);
+        Optional<StockReservation> optRes = reservationRepository
+                .findByOrderIdAndProduct_ProductId(req.getOrderId(), id);
 
         if (optRes.isPresent() && optRes.get().getStatus() != ReservationStatus.RELEASED) {
             StockReservation res = optRes.get();
@@ -101,7 +107,7 @@ public class StockManagementServiceImpl implements StockManagementService {
             res.setStatus(ReservationStatus.RELEASED);
             reservationRepository.save(res);
 
-            return Optional.of(ProductResponse.fromEntity(p));
+            return Optional.of(mapToResponseSafe(p));
         }
         return Optional.empty();
     }
@@ -110,16 +116,15 @@ public class StockManagementServiceImpl implements StockManagementService {
     @Transactional
     public Optional<ProductResponse> processPostOrder(UUID productId, PostOrderRequest req) {
         Product p = productRepository.findById(productId).orElse(null);
-        if (p == null) {
-            return Optional.empty();
-        }
+        if (p == null) return Optional.empty();
 
         String action = req.getAction();
         if (action == null || (!action.equals("CONFIRM") && !action.equals("CANCEL"))) {
-            throw new IllegalArgumentException("Invalid action");
+            throw new IllegalArgumentException("Invalid action. Must be 'CONFIRM' or 'CANCEL'.");
         }
 
-        Optional<StockReservation> optRes = reservationRepository.findByOrderIdAndProduct_ProductId(req.getOrderId(), productId);
+        Optional<StockReservation> optRes = reservationRepository
+                .findByOrderIdAndProduct_ProductId(req.getOrderId(), productId);
 
         if (action.equals("CONFIRM")) {
             handleConfirmAction(p, optRes, req);
@@ -127,7 +132,7 @@ public class StockManagementServiceImpl implements StockManagementService {
             handleCancelAction(p, optRes);
         }
 
-        return Optional.of(ProductResponse.fromEntity(p));
+        return Optional.of(mapToResponseSafe(p));
     }
 
     private void handleConfirmAction(Product p, Optional<StockReservation> optRes, PostOrderRequest req) {
@@ -140,6 +145,7 @@ public class StockManagementServiceImpl implements StockManagementService {
             p.setTotalOrders(currentOrders + 1);
         }
 
+        // calculateNewRating handles totalReviews increment internally — self-contained
         if (req.getRating() != null && req.getRating() >= 1.0 && req.getRating() <= 5.0) {
             calculateNewRating(p, req.getRating().floatValue());
         }
@@ -147,6 +153,7 @@ public class StockManagementServiceImpl implements StockManagementService {
         productRepository.save(p);
     }
 
+    // Self-contained: increment totalReviews dan hitung avg di sini sekaligus
     private void calculateNewRating(Product p, float incomingRating) {
         int currentReviews = p.getTotalReviews() != null ? p.getTotalReviews() : 0;
         float currentAvg = p.getAvgRating() != null ? p.getAvgRating() : 0.0f;
