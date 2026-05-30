@@ -355,7 +355,7 @@ class StockManagementServiceImplTest {
             stockService.processPostOrder(productId, req);
         });
 
-        assertEquals("Invalid action", exception.getMessage());
+        assertEquals("Invalid action. Must be 'CONFIRM' or 'CANCEL'.", exception.getMessage());
     }
 
     @Test
