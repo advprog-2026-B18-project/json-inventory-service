@@ -148,8 +148,12 @@ public class ProductServiceImpl implements ProductService {
                 res.getJastiper().setFullName((String) jastiperProfile.get("full_name"));
                 res.getJastiper().setProfilePictureUrl((String) jastiperProfile.get("profile_picture_url"));
 
-                if (jastiperProfile.containsKey("avg_rating")) {
-                    res.getJastiper().setAvgRating(Double.valueOf(jastiperProfile.get("avg_rating").toString()));
+                if (jastiperProfile.containsKey("rating")) {
+                    res.getJastiper().setAvgRating(Double.valueOf(jastiperProfile.get("rating").toString()));
+                }
+
+                if (jastiperProfile.get("stats") instanceof Map<?, ?> stats && stats.containsKey("total_orders")) {
+                    res.getJastiper().setTotalOrders(((Number) stats.get("total_orders")).intValue());
                 }
             }
         } catch (Exception ignored) {

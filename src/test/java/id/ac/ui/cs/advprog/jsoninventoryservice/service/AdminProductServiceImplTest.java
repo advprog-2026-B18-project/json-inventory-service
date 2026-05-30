@@ -3,15 +3,15 @@ package id.ac.ui.cs.advprog.jsoninventoryservice.service;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.AdminProductUpdateRequest;
 import id.ac.ui.cs.advprog.jsoninventoryservice.dto.response.ProductResponse;
 import id.ac.ui.cs.advprog.jsoninventoryservice.event.ProductModeratedEvent;
+import id.ac.ui.cs.advprog.jsoninventoryservice.model.Category;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.ModerationLog;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.Product;
-import id.ac.ui.cs.advprog.jsoninventoryservice.model.Category;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ModerationAction;
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.enums.ProductStatus;
+import id.ac.ui.cs.advprog.jsoninventoryservice.repository.CategoryRepository;
 import id.ac.ui.cs.advprog.jsoninventoryservice.repository.ModerationLogRepository;
 import id.ac.ui.cs.advprog.jsoninventoryservice.repository.ProductRepository;
 import id.ac.ui.cs.advprog.jsoninventoryservice.repository.StockReservationRepository;
-import id.ac.ui.cs.advprog.jsoninventoryservice.repository.CategoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,10 +38,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -196,7 +193,8 @@ class AdminProductServiceImplTest {
         AdminProductUpdateRequest req = new AdminProductUpdateRequest();
         req.setAction("INVALID");
         when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> adminService.moderateProduct(adminId, productId, req));
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> adminService.moderateProduct(adminId, productId, req));
         assertTrue(exception.getMessage().contains("REMOVE, RESTORE, HIDE, ACTIVATE"));
     }
 
@@ -245,7 +243,7 @@ class AdminProductServiceImplTest {
         String keyword = "test";
         Pageable pageable = PageRequest.of(0, 10);
         UUID mockJastiperId = UUID.randomUUID();
-        
+
         Product adminProduct = Product.builder()
                 .productId(UUID.randomUUID())
                 .jastiperId(mockJastiperId)
@@ -261,11 +259,16 @@ class AdminProductServiceImplTest {
         dummyCategory.setCategoryId(1);
         dummyCategory.setName("Elektronik");
 
+        // Dari server: pakai key "rating" + nested "stats" dengan total_orders
+        Map<String, Object> mockStats = new HashMap<>();
+        mockStats.put("total_orders", 15);
+
         Map<String, Object> mockProfile = new HashMap<>();
         mockProfile.put("username", "admin_jastip");
         mockProfile.put("full_name", "Admin Jastip");
         mockProfile.put("profile_picture_url", "http://image.png");
-        mockProfile.put("avg_rating", 4.8);
+        mockProfile.put("rating", 4.8);
+        mockProfile.put("stats", mockStats);
 
         Page<Product> page = new PageImpl<>(List.of(adminProduct));
         when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
@@ -286,7 +289,7 @@ class AdminProductServiceImplTest {
         String keyword = "test";
         Pageable pageable = PageRequest.of(0, 10);
         UUID mockJastiperId = UUID.randomUUID();
-        
+
         Product adminProduct = Product.builder()
                 .productId(UUID.randomUUID())
                 .jastiperId(mockJastiperId)
@@ -299,7 +302,8 @@ class AdminProductServiceImplTest {
 
         Page<Product> page = new PageImpl<>(List.of(adminProduct));
         when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
-        when(authIntegrationService.getJastiperProfile(mockJastiperId)).thenThrow(new RuntimeException("Auth Service Down"));
+        when(authIntegrationService.getJastiperProfile(mockJastiperId))
+                .thenThrow(new RuntimeException("Auth Service Down"));
 
         Page<ProductResponse> result = adminService.getAllProductsAdmin(keyword, null, null, null, pageable);
 
@@ -312,7 +316,7 @@ class AdminProductServiceImplTest {
         String keyword = "test";
         Pageable pageable = PageRequest.of(0, 10);
         UUID mockJastiperId = UUID.randomUUID();
-        
+
         Product adminProduct = Product.builder()
                 .productId(UUID.randomUUID())
                 .jastiperId(mockJastiperId)
@@ -342,7 +346,7 @@ class AdminProductServiceImplTest {
         String keyword = "test";
         Pageable pageable = PageRequest.of(0, 10);
         UUID mockJastiperId = UUID.randomUUID();
-        
+
         Product adminProduct = Product.builder()
                 .productId(UUID.randomUUID())
                 .jastiperId(mockJastiperId)
@@ -354,8 +358,8 @@ class AdminProductServiceImplTest {
                 .build();
 
         Page<Product> page = new PageImpl<>(List.of(adminProduct));
-        
         when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+
         when(authIntegrationService.getJastiperProfile(mockJastiperId)).thenReturn(new HashMap<>());
         Page<ProductResponse> resultEmpty = adminService.getAllProductsAdmin(keyword, null, null, null, pageable);
         assertFalse(resultEmpty.getContent().isEmpty());
@@ -370,11 +374,11 @@ class AdminProductServiceImplTest {
         String keyword = "test";
         Pageable pageable = PageRequest.of(0, 10);
         UUID mockJastiperId = UUID.randomUUID();
-        
+
         Product adminProduct = Product.builder()
                 .productId(UUID.randomUUID())
                 .jastiperId(mockJastiperId)
-                .categoryId(999) 
+                .categoryId(999)
                 .name("Barang Test")
                 .price(5000)
                 .stock(5)
@@ -384,7 +388,6 @@ class AdminProductServiceImplTest {
 
         Page<Product> page = new PageImpl<>(List.of(adminProduct));
         when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
-        
         when(categoryRepository.findById(999)).thenReturn(Optional.empty());
         when(authIntegrationService.getJastiperProfile(mockJastiperId)).thenReturn(null);
 
@@ -397,7 +400,7 @@ class AdminProductServiceImplTest {
         String keyword = "test";
         Pageable pageable = PageRequest.of(0, 10);
         UUID mockJastiperId = UUID.randomUUID();
-        
+
         Product adminProduct = Product.builder()
                 .productId(UUID.randomUUID())
                 .jastiperId(mockJastiperId)
@@ -426,13 +429,13 @@ class AdminProductServiceImplTest {
         preInitializedResponse.setJastiper(ProductResponse.JastiperInfo.builder().userId(mockJastiperId).build());
 
         try (MockedStatic<ProductResponse> mockedResponse = mockStatic(ProductResponse.class)) {
-            mockedResponse.when(() -> ProductResponse.fromEntity(any(Product.class))).thenReturn(preInitializedResponse);
+            mockedResponse.when(() -> ProductResponse.fromEntity(any(Product.class)))
+                    .thenReturn(preInitializedResponse);
 
             Page<ProductResponse> result = adminService.getAllProductsAdmin(keyword, null, null, null, pageable);
 
             assertFalse(result.getContent().isEmpty());
             ProductResponse response = result.getContent().get(0);
-            
             assertEquals("Elektronik Baru", response.getCategory().getName());
             assertEquals("jastiper_override", response.getJastiper().getUsername());
         }
@@ -458,15 +461,13 @@ class AdminProductServiceImplTest {
 
         try (MockedStatic<ProductResponse> mocked = mockStatic(ProductResponse.class)) {
             mocked.when(() -> ProductResponse.fromEntity(any(Product.class))).thenReturn(emptyResponse);
-            
+
             Optional<ProductResponse> result = adminService.getAdminProductDetail(adminProduct.getProductId());
-            
+
             assertTrue(result.isPresent());
-            
             assertNotNull(result.get().getCategory());
             assertEquals(3, result.get().getCategory().getId());
             assertEquals("Category 3", result.get().getCategory().getName());
-            
             assertNotNull(result.get().getJastiper());
             assertEquals(mockJastiperId, result.get().getJastiper().getUserId());
         }

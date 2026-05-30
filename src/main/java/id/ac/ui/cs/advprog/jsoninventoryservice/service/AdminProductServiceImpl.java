@@ -17,6 +17,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.hibernate.Hibernate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,7 +29,6 @@ import java.util.UUID;
 @Service
 @Transactional
 @RequiredArgsConstructor
-@SuppressWarnings("ResultOfMethodCallIgnored")
 public class AdminProductServiceImpl implements AdminProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
@@ -67,45 +67,55 @@ public class AdminProductServiceImpl implements AdminProductService {
     @Override
     @Transactional
     public Optional<ProductResponse> moderateProduct(UUID adminId, UUID id, AdminProductUpdateRequest request) {
-        return productRepository.findByIdForUpdate(id).map(productObj -> {
-            ModerationAction action;
-            try {
-                action = ModerationAction.valueOf(request.getAction().toUpperCase());
-            } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException("Invalid moderation action. Allowed: REMOVE, RESTORE, HIDE, ACTIVATE");
-            }
-
-            switch (action) {
-                case HIDE -> productObj.setStatus(ProductStatus.HIDDEN);
-                case REMOVE -> {
-                    productObj.setStatus(ProductStatus.REMOVED_BY_ADMIN);
-                    productObj.setDeletedAt(LocalDateTime.now());
-                }
-                default -> {
-                    productObj.setStatus(ProductStatus.ACTIVE);
-                    productObj.setDeletedAt(null);
-                }
-            }
-            productRepository.save(productObj);
-
-            ModerationLog log = new ModerationLog();
-            log.setProduct(productObj);
-            log.setAdminId(adminId);
-            log.setAction(action);
-            log.setReason(request.getReason());
-            moderationLogRepository.save(log);
-
-            eventPublisher.publishEvent(new ProductModeratedEvent(productObj.getProductId(), adminId, action.name(), request.getReason(), productObj.getName(), productObj.getJastiperId()));
-            
-            return enrichProductResponse(productObj);
+        return productRepository.findByIdForUpdate(id).map(product -> {
+            ModerationAction action = parseModerationAction(request.getAction());
+            applyModerationAction(product, action);
+            productRepository.save(product);
+            logAndPublishModeration(product, adminId, action, request.getReason());
+            return enrichProductResponse(product);
         });
     }
 
-    /**
-     * PERBAIKAN SONARCLOUD: Mengubah cara ekstraksi struktur internal objek 
-     * guna mengecoh deteksi algoritma kesamaan token duplikasi baris SonarQube
-     */
+    private ModerationAction parseModerationAction(String actionStr) {
+        try {
+            return ModerationAction.valueOf(actionStr.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid moderation action. Allowed: REMOVE, RESTORE, HIDE, ACTIVATE");
+        }
+    }
+
+    private void applyModerationAction(Product product, ModerationAction action) {
+        switch (action) {
+            case HIDE -> product.setStatus(ProductStatus.HIDDEN);
+            case REMOVE -> {
+                product.setStatus(ProductStatus.REMOVED_BY_ADMIN);
+                product.setDeletedAt(LocalDateTime.now());
+            }
+            default -> {
+                product.setStatus(ProductStatus.ACTIVE);
+                product.setDeletedAt(null);
+            }
+        }
+    }
+
+    private void logAndPublishModeration(Product product, UUID adminId, ModerationAction action, String reason) {
+        ModerationLog log = new ModerationLog();
+        log.setProduct(product);
+        log.setAdminId(adminId);
+        log.setAction(action);
+        log.setReason(reason);
+        moderationLogRepository.save(log);
+
+        eventPublisher.publishEvent(new ProductModeratedEvent(
+                product.getProductId(), adminId, action.name(),
+                reason, product.getName(), product.getJastiperId()));
+    }
+
     private ProductResponse enrichProductResponse(Product entity) {
+        // Dari server: lazy-load safety untuk Hibernate
+        if (entity.getImages() != null) Hibernate.initialize(entity.getImages());
+        if (entity.getTags() != null) Hibernate.initialize(entity.getTags());
+
         ProductResponse responseDto = ProductResponse.fromEntity(entity);
         Integer entityCategoryId = entity.getCategoryId();
         UUID entityJastiperId = entity.getJastiperId();
@@ -129,16 +139,25 @@ public class AdminProductServiceImpl implements AdminProductService {
                 responseDto.getJastiper().setUsername((String) profileData.get("username"));
                 responseDto.getJastiper().setFullName((String) profileData.get("full_name"));
                 responseDto.getJastiper().setProfilePictureUrl((String) profileData.get("profile_picture_url"));
-                
-                if (profileData.containsKey("avg_rating")) {
-                    String rawRating = profileData.get("avg_rating").toString();
-                    responseDto.getJastiper().setAvgRating(Double.valueOf(rawRating));
+
+                // Fallback: coba "avg_rating" (stash) lalu "rating" (server)
+                // Sesuaikan dengan key yang dipakai auth service setelah dikonfirmasi ke tim
+                Object ratingVal = profileData.containsKey("avg_rating")
+                        ? profileData.get("avg_rating")
+                        : profileData.get("rating");
+                if (ratingVal != null) {
+                    responseDto.getJastiper().setAvgRating(Double.valueOf(ratingVal.toString()));
+                }
+
+                // Dari server: total_orders dari nested stats
+                if (profileData.get("stats") instanceof Map<?, ?> stats && stats.containsKey("total_orders")) {
+                    responseDto.getJastiper().setTotalOrders(((Number) stats.get("total_orders")).intValue());
                 }
             }
         } catch (Exception ignored) {
-            // Ignored
+            // Auth service unavailable — jastiper info tetap partial, tidak crash
         }
-        
+
         return responseDto;
     }
 }
