@@ -15,6 +15,7 @@ import id.ac.ui.cs.advprog.jsoninventoryservice.repository.StockReservationRepos
 import id.ac.ui.cs.advprog.jsoninventoryservice.strategy.ShoppingModeProvider;
 import id.ac.ui.cs.advprog.jsoninventoryservice.strategy.ShoppingModeStrategy;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.Hibernate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,15 +24,14 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-@SuppressWarnings("ResultOfMethodCallIgnored")
 public class StockManagementServiceImpl implements StockManagementService {
     private final ProductRepository productRepository;
     private final StockReservationRepository reservationRepository;
     private final ShoppingModeProvider shoppingModeProvider;
 
     private ProductResponse mapToResponseSafe(Product p) {
-        if (p.getImages() != null) p.getImages().size();
-        if (p.getTags() != null) p.getTags().size();
+        if (p.getImages() != null) Hibernate.initialize(p.getImages());
+        if (p.getTags() != null) Hibernate.initialize(p.getTags());
         return ProductResponse.fromEntity(p);
     }
 

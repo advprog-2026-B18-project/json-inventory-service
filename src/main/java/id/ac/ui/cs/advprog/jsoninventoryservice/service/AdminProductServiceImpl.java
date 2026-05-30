@@ -68,39 +68,47 @@ public class AdminProductServiceImpl implements AdminProductService {
     @Transactional
     public Optional<ProductResponse> moderateProduct(UUID adminId, UUID id, AdminProductUpdateRequest request) {
         return productRepository.findByIdForUpdate(id).map(product -> {
-            ModerationAction action;
-            try {
-                action = ModerationAction.valueOf(request.getAction().toUpperCase());
-            } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException("Invalid moderation action. Allowed: REMOVE, RESTORE, HIDE, ACTIVATE");
-            }
-
-            switch (action) {
-                case HIDE -> product.setStatus(ProductStatus.HIDDEN);
-                case REMOVE -> {
-                    product.setStatus(ProductStatus.REMOVED_BY_ADMIN);
-                    product.setDeletedAt(LocalDateTime.now());
-                }
-                default -> {
-                    product.setStatus(ProductStatus.ACTIVE);
-                    product.setDeletedAt(null);
-                }
-            }
+            ModerationAction action = parseModerationAction(request.getAction());
+            applyModerationAction(product, action);
             productRepository.save(product);
-
-            ModerationLog log = new ModerationLog();
-            log.setProduct(product);
-            log.setAdminId(adminId);
-            log.setAction(action);
-            log.setReason(request.getReason());
-            moderationLogRepository.save(log);
-
-            eventPublisher.publishEvent(new ProductModeratedEvent(
-                    product.getProductId(), adminId, action.name(),
-                    request.getReason(), product.getName(), product.getJastiperId()));
-
+            logAndPublishModeration(product, adminId, action, request.getReason());
             return enrichProductResponse(product);
         });
+    }
+
+    private ModerationAction parseModerationAction(String actionStr) {
+        try {
+            return ModerationAction.valueOf(actionStr.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid moderation action. Allowed: REMOVE, RESTORE, HIDE, ACTIVATE");
+        }
+    }
+
+    private void applyModerationAction(Product product, ModerationAction action) {
+        switch (action) {
+            case HIDE -> product.setStatus(ProductStatus.HIDDEN);
+            case REMOVE -> {
+                product.setStatus(ProductStatus.REMOVED_BY_ADMIN);
+                product.setDeletedAt(LocalDateTime.now());
+            }
+            default -> {
+                product.setStatus(ProductStatus.ACTIVE);
+                product.setDeletedAt(null);
+            }
+        }
+    }
+
+    private void logAndPublishModeration(Product product, UUID adminId, ModerationAction action, String reason) {
+        ModerationLog log = new ModerationLog();
+        log.setProduct(product);
+        log.setAdminId(adminId);
+        log.setAction(action);
+        log.setReason(reason);
+        moderationLogRepository.save(log);
+
+        eventPublisher.publishEvent(new ProductModeratedEvent(
+                product.getProductId(), adminId, action.name(),
+                reason, product.getName(), product.getJastiperId()));
     }
 
     private ProductResponse enrichProductResponse(Product entity) {
