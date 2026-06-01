@@ -7,8 +7,6 @@ import id.ac.ui.cs.advprog.jsoninventoryservice.exception.DuplicateResourceExcep
 import id.ac.ui.cs.advprog.jsoninventoryservice.model.Category;
 import id.ac.ui.cs.advprog.jsoninventoryservice.repository.CategoryRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,7 +19,6 @@ public class CategoryServiceImpl implements CategoryService {
     private final CategoryRepository categoryRepository;
 
     @Override
-    @Cacheable(value = "categories")
     public List<CategoryResponse> getAllCategories() {
         return categoryRepository.findAll().stream()
                 .map(CategoryResponse::fromEntity)
@@ -30,7 +27,6 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     @Transactional
-    @CacheEvict(value = "categories", allEntries = true)
     public CategoryResponse createCategory(CategoryRequest request) {
         if (categoryRepository.existsByNameIgnoreCase(request.getName())) {
             throw new DuplicateResourceException("Category with name '" + request.getName() + "' already exists.");
@@ -45,7 +41,6 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     @Transactional
-    @CacheEvict(value = "categories", allEntries = true)
     public void deleteCategory(Integer id) {
         Category category = categoryRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Category not found"));
 
@@ -57,7 +52,6 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     @Transactional
-    @CacheEvict(value = "categories", allEntries = true)
     public CategoryResponse updateCategory(Integer id, CategoryRequest request) {
         Category category = categoryRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Category not found"));
 
