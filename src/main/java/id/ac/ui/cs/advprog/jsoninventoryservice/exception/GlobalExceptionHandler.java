@@ -2,9 +2,11 @@ package id.ac.ui.cs.advprog.jsoninventoryservice.exception;
 
 import id.ac.ui.cs.advprog.jsoninventoryservice.utils.ApiResponse;
 import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -67,6 +69,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(StockOperationException.class)
     public ResponseEntity<Map<String, Object>> handleStockOperation(StockOperationException ex) {
         return buildErrorResponse(HttpStatus.valueOf(ex.getStatusCode()), ex.getMessage(), null);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleDataIntegrity(DataIntegrityViolationException ex) {
+        return buildErrorResponse(HttpStatus.CONFLICT, "Resource already exists or constraint violation.", null);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> handleMessageNotReadable(HttpMessageNotReadableException ex) {
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "Invalid request body format.", null);
     }
 
     @ExceptionHandler({CannotAcquireLockException.class, PessimisticLockingFailureException.class})
