@@ -1138,4 +1138,81 @@ class ProductServiceImplTest {
 
         assertTrue(result.isEmpty());
     }
+
+    @Test
+    void testUpdateProduct_SameCategory_StatusActiveToHidden_DecrementsCount() {
+        ProductUpdateRequest req = new ProductUpdateRequest();
+        req.setCategoryId(1);
+        req.setStatus("HIDDEN");
+
+        Category cat = new Category();
+        cat.setCategoryId(1);
+        cat.setProductCount(5);
+
+        dummyProduct.setCategoryId(1);
+        dummyProduct.setStatus(ProductStatus.ACTIVE);
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+        when(categoryRepository.findById(1)).thenReturn(Optional.of(cat));
+        when(productRepository.save(any())).thenReturn(dummyProduct);
+
+        productService.updateProduct(jastiperId, productId, req);
+
+        assertEquals(4, cat.getProductCount());
+        verify(categoryRepository).save(cat);
+    }
+
+    @Test
+    void testUpdateProduct_SameCategory_StatusHiddenToActive_IncrementsCount() {
+        ProductUpdateRequest req = new ProductUpdateRequest();
+        req.setCategoryId(1);
+        req.setStatus("ACTIVE");
+
+        Category cat = new Category();
+        cat.setCategoryId(1);
+        cat.setProductCount(5);
+
+        dummyProduct.setCategoryId(1);
+        dummyProduct.setStatus(ProductStatus.HIDDEN);
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+        when(categoryRepository.findById(1)).thenReturn(Optional.of(cat));
+        when(productRepository.save(any())).thenReturn(dummyProduct);
+
+        productService.updateProduct(jastiperId, productId, req);
+
+        assertEquals(6, cat.getProductCount());
+        verify(categoryRepository).save(cat);
+    }
+
+    @Test
+    void testUpdateProduct_OutOfStockToActive_WithExplicitStatusOutOfStockAndPositiveStock() {
+        dummyProduct.setStatus(ProductStatus.OUT_OF_STOCK);
+        dummyProduct.setStock(0);
+
+        ProductUpdateRequest req = new ProductUpdateRequest();
+        req.setStock(10);
+        req.setStatus("OUT_OF_STOCK");
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(dummyProduct));
+        when(productRepository.save(any())).thenReturn(dummyProduct);
+
+        productService.updateProduct(jastiperId, productId, req);
+
+        assertEquals(ProductStatus.ACTIVE, dummyProduct.getStatus());
+    }
+
+    @Test
+    void testGetProductById_ProfileStatsNotMap_Coverage() {
+        dummyProduct.setPrice(100);
+        dummyProduct.setStock(10);
+        Map<String, Object> profile = new HashMap<>();
+        profile.put("stats", "BukanBerwujudMap");
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(dummyProduct));
+        when(authIntegrationService.getJastiperProfile(jastiperId)).thenReturn(profile);
+
+        Optional<ProductResponse> res = productService.getProductById(productId);
+        assertTrue(res.isPresent());
+    }
 }

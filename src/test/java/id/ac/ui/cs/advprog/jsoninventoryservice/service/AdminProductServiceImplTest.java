@@ -259,7 +259,6 @@ class AdminProductServiceImplTest {
         dummyCategory.setCategoryId(1);
         dummyCategory.setName("Elektronik");
 
-        // Dari server: pakai key "rating" + nested "stats" dengan total_orders
         Map<String, Object> mockStats = new HashMap<>();
         mockStats.put("total_orders", 15);
 
@@ -471,5 +470,83 @@ class AdminProductServiceImplTest {
             assertNotNull(result.get().getJastiper());
             assertEquals(mockJastiperId, result.get().getJastiper().getUserId());
         }
+    }
+
+    @Test
+    void testModerateProduct_ActiveToHidden_UpdatesCategoryCount() {
+        UUID adminId = UUID.randomUUID();
+        Product product = Product.builder()
+                .productId(productId)
+                .categoryId(1)
+                .status(ProductStatus.ACTIVE)
+                .price(150000)
+                .stock(10)
+                .build();
+        Category cat = new Category();
+        cat.setCategoryId(1);
+        cat.setProductCount(5);
+
+        id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.AdminProductUpdateRequest req =
+                new id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.AdminProductUpdateRequest();
+        req.setAction("HIDE");
+        req.setReason("Inappropriate");
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+        when(categoryRepository.findById(1)).thenReturn(Optional.of(cat));
+
+        var res = adminService.moderateProduct(adminId, productId, req);
+
+        assertTrue(res.isPresent());
+        assertEquals(4, cat.getProductCount());
+        verify(categoryRepository).save(cat);
+    }
+
+    @Test
+    void testModerateProduct_HiddenToActive_UpdatesCategoryCount() {
+        UUID adminId = UUID.randomUUID();
+        Product product = Product.builder()
+                .productId(productId)
+                .categoryId(1)
+                .status(ProductStatus.HIDDEN)
+                .price(150000)
+                .stock(10)
+                .build();
+        Category cat = new Category();
+        cat.setCategoryId(1);
+        cat.setProductCount(5);
+
+        id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.AdminProductUpdateRequest req =
+                new id.ac.ui.cs.advprog.jsoninventoryservice.dto.request.AdminProductUpdateRequest();
+        req.setAction("ACTIVATE");
+        req.setReason("Resolved");
+
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+        when(categoryRepository.findById(1)).thenReturn(Optional.of(cat));
+
+        var res = adminService.moderateProduct(adminId, productId, req);
+
+        assertTrue(res.isPresent());
+        assertEquals(6, cat.getProductCount());
+        verify(categoryRepository).save(cat);
+    }
+
+    @Test
+    void testEnrichProductResponse_WithAvgRatingKeyFallback() {
+        UUID mockJastiperId = UUID.randomUUID();
+        Product productWithJastiper = Product.builder()
+                .productId(productId)
+                .jastiperId(mockJastiperId)
+                .price(150000)
+                .stock(10)
+                .build();
+        Map<String, Object> profile = new HashMap<>();
+        profile.put("avg_rating", 4.8);
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(productWithJastiper));
+        when(authIntegrationService.getJastiperProfile(mockJastiperId)).thenReturn(profile);
+
+        var res = adminService.getAdminProductDetail(productId);
+        assertTrue(res.isPresent());
+        assertEquals(4.8, res.get().getJastiper().getAvgRating());
     }
 }
