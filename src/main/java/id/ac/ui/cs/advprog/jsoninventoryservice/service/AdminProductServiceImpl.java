@@ -68,12 +68,39 @@ public class AdminProductServiceImpl implements AdminProductService {
     @Transactional
     public Optional<ProductResponse> moderateProduct(UUID adminId, UUID id, AdminProductUpdateRequest request) {
         return productRepository.findByIdForUpdate(id).map(product -> {
+            ProductStatus oldStatus = product.getStatus();
+
             ModerationAction action = parseModerationAction(request.getAction());
             applyModerationAction(product, action);
+
+            ProductStatus newStatus = product.getStatus();
+
+            updateCategoryProductCount(product.getCategoryId(), oldStatus, newStatus);
+
             productRepository.save(product);
             logAndPublishModeration(product, adminId, action, request.getReason());
             return enrichProductResponse(product);
         });
+    }
+
+    private void updateCategoryProductCount(Integer categoryId, ProductStatus oldStatus, ProductStatus newStatus) {
+        if (categoryId == null) return;
+
+        boolean wasActive = (oldStatus == ProductStatus.ACTIVE || oldStatus == ProductStatus.OUT_OF_STOCK);
+        boolean isActiveNow = (newStatus == ProductStatus.ACTIVE || newStatus == ProductStatus.OUT_OF_STOCK);
+
+        if (wasActive && !isActiveNow) {
+            categoryRepository.findById(categoryId).ifPresent(cat -> {
+                cat.setProductCount(Math.max(0, cat.getProductCount() - 1));
+                categoryRepository.save(cat);
+            });
+        }
+        else if (!wasActive && isActiveNow) {
+            categoryRepository.findById(categoryId).ifPresent(cat -> {
+                cat.setProductCount(cat.getProductCount() + 1);
+                categoryRepository.save(cat);
+            });
+        }
     }
 
     private ModerationAction parseModerationAction(String actionStr) {
@@ -112,7 +139,6 @@ public class AdminProductServiceImpl implements AdminProductService {
     }
 
     private ProductResponse enrichProductResponse(Product entity) {
-        // Dari server: lazy-load safety untuk Hibernate
         if (entity.getImages() != null) Hibernate.initialize(entity.getImages());
         if (entity.getTags() != null) Hibernate.initialize(entity.getTags());
 
@@ -140,8 +166,6 @@ public class AdminProductServiceImpl implements AdminProductService {
                 responseDto.getJastiper().setFullName((String) profileData.get("full_name"));
                 responseDto.getJastiper().setProfilePictureUrl((String) profileData.get("profile_picture_url"));
 
-                // Fallback: coba "avg_rating" (stash) lalu "rating" (server)
-                // Sesuaikan dengan key yang dipakai auth service setelah dikonfirmasi ke tim
                 Object ratingVal = profileData.containsKey("avg_rating")
                         ? profileData.get("avg_rating")
                         : profileData.get("rating");
@@ -149,13 +173,12 @@ public class AdminProductServiceImpl implements AdminProductService {
                     responseDto.getJastiper().setAvgRating(Double.valueOf(ratingVal.toString()));
                 }
 
-                // Dari server: total_orders dari nested stats
                 if (profileData.get("stats") instanceof Map<?, ?> stats && stats.containsKey("total_orders")) {
                     responseDto.getJastiper().setTotalOrders(((Number) stats.get("total_orders")).intValue());
                 }
             }
         } catch (Exception ignored) {
-            // Auth service unavailable — jastiper info tetap partial, tidak crash
+            // Ignored
         }
 
         return responseDto;

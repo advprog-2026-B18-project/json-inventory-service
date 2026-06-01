@@ -169,13 +169,50 @@ public class ProductServiceImpl implements ProductService {
                 throw new UnauthorizedAccessException("You are not authorized to modify this product.");
             }
 
+            Integer oldCategoryId = existing.getCategoryId();
+            ProductStatus oldStatus = existing.getStatus();
+
             updateBasicFields(existing, req);
             updateStockAndStatus(existing, req);
             updateCategory(existing, req);
 
+            syncCategoryProductCount(oldCategoryId, oldStatus, existing.getCategoryId(), existing.getStatus());
+
             Product savedProduct = productRepository.save(existing);
             return ProductResponse.fromEntity(savedProduct);
         });
+    }
+
+    private void syncCategoryProductCount(Integer oldCatId, ProductStatus oldStatus, Integer newCatId, ProductStatus newStatus) {
+        boolean wasActive = oldCatId != null && (oldStatus == ProductStatus.ACTIVE || oldStatus == ProductStatus.OUT_OF_STOCK);
+        boolean isActiveNow = newCatId != null && (newStatus == ProductStatus.ACTIVE || newStatus == ProductStatus.OUT_OF_STOCK);
+
+        if (Objects.equals(oldCatId, newCatId)) {
+            if (wasActive && !isActiveNow) {
+                categoryRepository.findById(oldCatId).ifPresent(cat -> {
+                    cat.setProductCount(Math.max(0, cat.getProductCount() - 1));
+                    categoryRepository.save(cat);
+                });
+            } else if (!wasActive && isActiveNow) {
+                categoryRepository.findById(oldCatId).ifPresent(cat -> {
+                    cat.setProductCount(cat.getProductCount() + 1);
+                    categoryRepository.save(cat);
+                });
+            }
+        } else {
+            if (wasActive) {
+                categoryRepository.findById(oldCatId).ifPresent(cat -> {
+                    cat.setProductCount(Math.max(0, cat.getProductCount() - 1));
+                    categoryRepository.save(cat);
+                });
+            }
+            if (isActiveNow) {
+                categoryRepository.findById(newCatId).ifPresent(cat -> {
+                    cat.setProductCount(cat.getProductCount() + 1);
+                    categoryRepository.save(cat);
+                });
+            }
+        }
     }
 
     private void updateBasicFields(Product existing, ProductUpdateRequest req) {
@@ -230,18 +267,8 @@ public class ProductServiceImpl implements ProductService {
 
     private void updateCategory(Product existing, ProductUpdateRequest req) {
         if (req.getCategoryId() != null) {
-            Integer oldCategoryId = existing.getCategoryId();
             Category newCategory = categoryRepository.findById(req.getCategoryId()).orElse(null);
-
-            if (newCategory != null && !newCategory.getCategoryId().equals(oldCategoryId)) {
-                if (oldCategoryId != null) {
-                    categoryRepository.findById(oldCategoryId).ifPresent(oldCat -> {
-                        oldCat.setProductCount(Math.max(0, oldCat.getProductCount() - 1));
-                        categoryRepository.save(oldCat);
-                    });
-                }
-                newCategory.setProductCount(newCategory.getProductCount() + 1);
-                categoryRepository.save(newCategory);
+            if (newCategory != null) {
                 existing.setCategoryId(newCategory.getCategoryId());
             }
         }
