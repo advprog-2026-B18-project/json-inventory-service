@@ -51,6 +51,8 @@ public class StockManagementServiceImpl implements StockManagementService {
                     .build());
         }
 
+        boolean isReuse = existing.isPresent();
+
         return productRepository.findById(productId).flatMap(p -> {
             ShoppingModeStrategy strategy = shoppingModeProvider.getStrategy(p.getMode());
             if (!strategy.isEligibleForReservation(p, req.getQuantity())) {
@@ -68,12 +70,19 @@ public class StockManagementServiceImpl implements StockManagementService {
                 productRepository.updateStatusAtomic(productId, ProductStatus.OUT_OF_STOCK);
             }
 
-            StockReservation res = StockReservation.builder()
-                    .product(p)
-                    .orderId(req.getOrderId())
-                    .quantity(req.getQuantity())
-                    .status(ReservationStatus.PENDING)
-                    .build();
+            StockReservation res;
+            if (isReuse) {
+                res = existing.get();
+                res.setQuantity(req.getQuantity());
+                res.setStatus(ReservationStatus.PENDING);
+            } else {
+                res = StockReservation.builder()
+                        .product(p)
+                        .orderId(req.getOrderId())
+                        .quantity(req.getQuantity())
+                        .status(ReservationStatus.PENDING)
+                        .build();
+            }
             res = reservationRepository.save(res);
 
             return Optional.of(StockOperationResponse.builder()
